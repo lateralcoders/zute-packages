@@ -1,0 +1,4 @@
+[keeper-password-manager]
+source = "regex"
+url = "https://keepersecurity.com/desktop_electron/SHASUM256.txt"
+regex = "keeperpasswordmanager_([0-9.]+)_amd64\\.deb"

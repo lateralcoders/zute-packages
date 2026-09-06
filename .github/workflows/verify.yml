@@ -1,0 +1,22 @@
+name: verify PKGBUILD gate
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: verify PKGBUILD gate
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    steps:
+      - name: pacman
+        run: |
+          pacman -Sy --noconfirm archlinux-keyring
+          pacman -Syu --noconfirm --needed git curl
+      - uses: actions/checkout@v4
+      - name: verify PKGBUILD gate
+        run: bash scripts/verify-pkgbuild.sh

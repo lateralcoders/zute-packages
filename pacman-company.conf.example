@@ -1,0 +1,14 @@
+# Install as /etc/pacman.d/company.conf and add to /etc/pacman.conf:
+#   Include = /etc/pacman.d/company.conf
+#
+# SigLevel Required — never TrustAll. Import and lsign the key first
+# (scripts/enable-repo.sh).
+#
+# enable-repo.sh replaces @SERVER@ with GitHub Releases:
+#   https://github.com/OWNER/company-arch-packages/releases/latest/download
+# Local debug only:
+#   sudo COMPANY_REPO_SERVER=file:///path/to/company-arch-packages/repo ./scripts/enable-repo.sh
+
+[company]
+SigLevel = Required DatabaseRequired
+Server = @SERVER@

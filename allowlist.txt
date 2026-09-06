@@ -1,0 +1,3 @@
+# Foreign packages this git may wrap. One name per line.
+# Adding a name requires a human PR. CI fails packages not listed.
+keeper-password-manager

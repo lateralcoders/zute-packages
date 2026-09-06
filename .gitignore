@@ -1,0 +1,15 @@
+src/
+pkg/
+*.tar.gz
+*.tar.xz
+*.tar.zst
+*.pkg.tar.*
+!repo/.gitkeep
+repo/*.pkg.tar.*
+repo/*.db
+repo/*.db.*
+repo/*.files
+repo/*.files.*
+.gnupg/
+*.env
+.SRCINFO

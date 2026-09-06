@@ -1,0 +1,11 @@
+# Copy to CODEOWNERS at the repo root after you know the GitHub handles.
+# Personal Pro: use @user names. Team/Enterprise org: prefer @org/team.
+#
+# Required: Settings → Branches/Rulesets → "Require review from Code Owners"
+# Allowlist growth is a human decision. Do not let the bot own this file.
+
+*                         @REPLACE-engineer-1 @REPLACE-engineer-2
+allowlist.txt             @REPLACE-engineer-1 @REPLACE-engineer-2
+.github/                  @REPLACE-engineer-1 @REPLACE-engineer-2
+scripts/                  @REPLACE-engineer-1 @REPLACE-engineer-2
+packages/**/PKGBUILD      @REPLACE-engineer-1 @REPLACE-engineer-2

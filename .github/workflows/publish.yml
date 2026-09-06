@@ -1,0 +1,80 @@
+# Build, GPG-sign, and publish a pacman repo as a GitHub Release v<pkgver>.
+# Pull requests only run verify.yml (no secrets). This job is main /
+# workflow_dispatch so a PKGBUILD on a fork cannot exfiltrate GPG_SECRET_KEY.
+name: publish pacman repo
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/**"
+      - "allowlist.txt"
+      - "keys/**"
+      - "scripts/build-repo.sh"
+      - "scripts/flatten-repo-for-http.sh"
+      - "scripts/publish-github-release.sh"
+      - "scripts/import-ci-key.sh"
+      - ".github/workflows/publish.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: publish-company-repo
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: pacman
+        run: |
+          pacman -Sy --noconfirm archlinux-keyring
+          pacman -Syu --noconfirm --needed git gnupg github-cli sudo fakeroot debugedit
+
+      - uses: actions/checkout@v4
+
+      - name: builder user
+        run: |
+          id builder >/dev/null 2>&1 || useradd -m builder
+          echo 'builder ALL=(ALL) NOPASSWD: ALL' >/etc/sudoers.d/builder
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+
+      - name: import signing key
+        env:
+          GPG_SECRET_KEY: ${{ secrets.GPG_SECRET_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          sudo -u builder env \
+            HOME=/home/builder \
+            GNUPGHOME=/home/builder/.gnupg \
+            GPG_SECRET_KEY="$GPG_SECRET_KEY" \
+            GPG_PASSPHRASE="${GPG_PASSPHRASE:-}" \
+            bash scripts/import-ci-key.sh
+
+      - name: makepkg --sign + repo-add --sign
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          sudo -u builder env \
+            HOME=/home/builder \
+            GNUPGHOME=/home/builder/.gnupg \
+            GPGKEY="$(tr -d '[:space:]' </home/builder/fpr)" \
+            GPG_PASSPHRASE="${GPG_PASSPHRASE:-}" \
+            bash scripts/build-repo.sh
+
+      - name: GitHub Release v<pkgver>
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          sudo -u builder env \
+            HOME=/home/builder \
+            GNUPGHOME=/home/builder/.gnupg \
+            GH_TOKEN="$GITHUB_TOKEN" \
+            GITHUB_TOKEN="$GITHUB_TOKEN" \
+            GITHUB_REPOSITORY="$GITHUB_REPOSITORY" \
+            bash scripts/publish-github-release.sh

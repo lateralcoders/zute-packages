@@ -1,0 +1,2 @@
+# Built, signed packages live here after scripts/build-repo.sh.
+# Binaries are gitignored. Publish via GitHub Releases, not git.
