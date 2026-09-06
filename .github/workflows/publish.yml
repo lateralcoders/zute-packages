@@ -1,4 +1,4 @@
-# Build, GPG-sign, and publish a pacman repo as a GitHub Release v<pkgver>.
+# Build, GPG-sign, and publish a pacman repo as a GitHub Release repo-<UTC>.
 # Pull requests only run verify.yml (no secrets). This job is main /
 # workflow_dispatch so a PKGBUILD on a fork cannot exfiltrate GPG_SECRET_KEY.
 name: publish pacman repo
@@ -13,6 +13,7 @@ on:
       - "scripts/build-repo.sh"
       - "scripts/flatten-repo-for-http.sh"
       - "scripts/publish-github-release.sh"
+      - "scripts/pkg-lib.sh"
       - "scripts/import-ci-key.sh"
       - ".github/workflows/publish.yml"
   workflow_dispatch:
@@ -68,7 +69,7 @@ jobs:
             GPG_PASSPHRASE="${GPG_PASSPHRASE:-}" \
             bash scripts/build-repo.sh
 
-      - name: GitHub Release v<pkgver>
+      - name: GitHub Release
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           sudo -u builder env \

@@ -18,5 +18,7 @@ jobs:
           pacman -Sy --noconfirm archlinux-keyring
           pacman -Syu --noconfirm --needed git curl
       - uses: actions/checkout@v4
+      - name: package gate tests
+        run: bash test/run.sh
       - name: verify PKGBUILD gate
         run: bash scripts/verify-pkgbuild.sh

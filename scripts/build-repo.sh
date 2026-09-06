@@ -2,8 +2,9 @@
 # Build every allowlisted package, GPG-sign, repo-add --sign.
 # Requires: scripts/init-signing-key.sh already run; makepkg; repo-add.
 set -euo pipefail
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-ALLOW="$ROOT/allowlist.txt"
+_HERE="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=pkg-lib.sh
+source "$_HERE/pkg-lib.sh"
 export GNUPGHOME="${GNUPGHOME:-$ROOT/.gnupg}"
 [[ -d "$GNUPGHOME" ]] || { echo "run scripts/init-signing-key.sh first" >&2; exit 1; }
 fpr=$(gpg --list-secret-keys --with-colons | awk -F: '/^fpr:/{print $10; exit}')
@@ -16,13 +17,12 @@ mkdir -p "$ROOT/repo"
 # Drop stale db so repo-add is a full rebuild of allowlisted packages.
 rm -f "$ROOT/repo"/company.db* "$ROOT/repo"/company.files* "$ROOT/repo"/*.pkg.tar.*
 
-mapfile -t pkgs < <(grep -vE '^[[:space:]]*(#|$)' "$ALLOW")
-[[ ${#pkgs[@]} -gt 0 ]] || { echo "allowlist empty" >&2; exit 1; }
+company_load_gate
 
 export PACKAGER="${PACKAGER:-Company Arch Packages <packages@localhost>}"
 export GPGKEY="$fpr"
 
-for name in "${pkgs[@]}"; do
+for name in "${company_pkgs[@]}"; do
   dir="$ROOT/packages/$name"
   [[ -f "$dir/PKGBUILD" ]] || { echo "missing $dir/PKGBUILD" >&2; exit 1; }
   (

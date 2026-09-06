@@ -3,7 +3,9 @@
 # Default Server= is GitHub Releases (HTTPS). Does not TrustAll.
 # Run as root (or via sudo).
 set -euo pipefail
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+_HERE="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=pkg-lib.sh
+source "$_HERE/pkg-lib.sh"
 ASC="$ROOT/keys/company-arch-packages.asc"
 CONF_SRC="$ROOT/pacman-company.conf.example"
 ASC_TMP=""
@@ -68,4 +70,11 @@ fi
 pacman -Sy --noconfirm
 echo "enabled [company] SigLevel Required, key $fpr"
 echo "Server = $server"
-echo "next: pacman -S keeper-password-manager"
+if [[ -f "$ALLOW" ]]; then
+  mapfile -t _pkgs < <(company_allowlist)
+  if [[ ${#_pkgs[@]} -gt 0 ]]; then
+    echo "next: pacman -S ${_pkgs[*]}"
+  fi
+else
+  echo "next: pacman -Sy && pacman -Sl company"
+fi

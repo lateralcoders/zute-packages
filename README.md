@@ -5,18 +5,18 @@ Signed **pacman** repo for vendor apps Arch does not ship. First package: **Keep
 Sibling of `omarchy-policy-exception` (same parent directory). This is **not** AUR, Chaotic-AUR, Snap, or a second Omarchy.
 
 ```
-Keeper publishes .deb + SHASUM256.txt
+Vendor publishes artifact + checksums file
         ↓
-scripts/propose-keeper-update.sh (or nvchecker) opens a PR
+scripts/propose-update.sh (or nvchecker) opens one PR per package
         ↓
-CI verify.yml: scripts/verify-pkgbuild.sh  (URL + vendor hash)  — no signing secrets
+CI verify.yml: scripts/verify-pkgbuild.sh  (host + vendor hash, every allowlisted name)
         ↓
 Human merges to main
         ↓
 CI publish.yml: makepkg --sign + repo-add --sign
-        → GitHub Release v<pkgver>  (company.db + .pkg.tar.zst + signatures)
+        → GitHub Release repo-<UTC>  (company.db + every .pkg.tar.zst + signatures)
         ↓
-Laptop: scripts/enable-repo.sh && pacman -S keeper-password-manager
+Laptop: scripts/enable-repo.sh && pacman -S <allowlisted names>
         Server = https://github.com/<org>/company-arch-packages/releases/latest/download
 ```
 
@@ -28,12 +28,17 @@ The bot never merges. The allowlist never grows without a human PR. Packages are
 
 | Path | Role |
 |---|---|
-| `allowlist.txt` | Only these names may have a PKGBUILD |
+| `allowlist.txt` | Only these names may have a PKGBUILD. Extra `packages/*` dirs fail CI |
 | `packages/<name>/PKGBUILD` | Wrapper (Keeper unpacks vendor `.deb`) |
+| `packages/<name>/upstream` | Vendor `host`, checksums URL, filename glob, version regex |
 | `scripts/init-signing-key.sh` | One-time GnuPG key; public half in `keys/` |
 | `scripts/export-ci-secret.sh` | One-time: `gh secret set GPG_SECRET_KEY` |
+| `scripts/propose-update.sh` | Bump `pkgver` / `sha256sums` from each package's checksums file |
+| `scripts/verify-pkgbuild.sh` | Host + hash gate for every allowlisted name |
 | `scripts/build-repo.sh` | `makepkg --sign` + `repo-add --sign` → `repo/` (CI) |
 | `scripts/enable-repo.sh` | `pacman-key --lsign-key` + `[company]` HTTPS include |
+| `scripts/gen-nvchecker.sh` | Rebuild `nvchecker.toml` from every `upstream` file |
+| `test/run.sh` | N-package gate tests (no makepkg) |
 | `keys/company-arch-packages.asc` | Public signing key (commit after first keygen) |
 | `repo/` | Built db + packages (gitignored; Actions publishes) |
 
@@ -56,9 +61,9 @@ Never commit `.gnupg/`. After this, merge to `main` is what publishes.
 
 | Workflow | When | Secrets | What |
 |---|---|---|---|
-| `verify.yml` | every PR + push to `main` | none | `verify-pkgbuild.sh` (host + vendor hash) |
-| `propose-update.yml` | daily cron / manual | `GITHUB_TOKEN` | opens a Keeper bump PR; does not merge |
-| `publish.yml` | push to `main` (PKGBUILD paths) / `workflow_dispatch` | `GPG_SECRET_KEY` | build, sign, GitHub Release `v<pkgver>` |
+| `verify.yml` | every PR + push to `main` | none | `test/run.sh` + `verify-pkgbuild.sh` (every package) |
+| `propose-update.yml` | daily cron / manual | `GITHUB_TOKEN` | one bump PR per package; does not merge |
+| `publish.yml` | push to `main` (PKGBUILD paths) / `workflow_dispatch` | `GPG_SECRET_KEY` | build, sign, GitHub Release `repo-<UTC>` |
 
 PRs never see `GPG_SECRET_KEY`. Forks cannot publish.
 
@@ -99,7 +104,10 @@ Do **not** put this repo or `.pkg.tar.zst` on the day-one USB. That stick is ISO
 
 ## Adding a second vendor app
 
+Same human PR, all of:
+
 1. `packages/<name>/PKGBUILD`
-2. Add the name to `allowlist.txt` in a **human** PR
-3. CI fails names not on the list
-4. Merge to `main` republishes the whole `[company]` db
+2. `packages/<name>/upstream` (`host`, `sums_url`, `sums_glob`, `version_regex`; optional `sums_host` if checksums are on another FQDN)
+3. Add the name to `allowlist.txt`
+
+CI fails names not on the list, `packages/*` dirs not on the list, missing `upstream`, `source=` host mismatch, and sha256 ≠ vendor checksums. Merge to `main` republishes the whole `[company]` db. The bot may later bump that PKGBUILD; it cannot add the name.

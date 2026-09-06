@@ -9,3 +9,4 @@ allowlist.txt             @REPLACE-engineer-1 @REPLACE-engineer-2
 .github/                  @REPLACE-engineer-1 @REPLACE-engineer-2
 scripts/                  @REPLACE-engineer-1 @REPLACE-engineer-2
 packages/**/PKGBUILD      @REPLACE-engineer-1 @REPLACE-engineer-2
+packages/**/upstream      @REPLACE-engineer-1 @REPLACE-engineer-2

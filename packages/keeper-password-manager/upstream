@@ -1,0 +1,9 @@
+# Vendor checksum gate. Required next to PKGBUILD.
+# host: PKGBUILD source= URL must be this FQDN or a subdomain.
+# sums_url: vendor SHA-256 list (https). Optional sums_host= if checksums live elsewhere.
+# sums_glob: basename in that list; {pkgver} is substituted for verify.
+# version_regex: capture group 1 is the version (propose + nvchecker).
+host=keepersecurity.com
+sums_url=https://keepersecurity.com/desktop_electron/SHASUM256.txt
+sums_glob=keeperpasswordmanager_{pkgver}_amd64.deb
+version_regex=keeperpasswordmanager_([0-9.]+)_amd64\.deb

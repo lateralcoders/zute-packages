@@ -15,8 +15,9 @@ Do not flip live GitHub settings from this file until a human confirms the org, 
 | Rule | GitHub native? | How it actually holds |
 |---|---|---|
 | PKGBUILD may wrap only names in `allowlist.txt` | No | Required status check runs `scripts/verify-pkgbuild.sh` |
-| `source=` host is `keepersecurity.com` | No | Same check |
-| `sha256sums` equals vendor `SHASUM256.txt` | No | Same check (curl of https://keepersecurity.com/desktop_electron/SHASUM256.txt) |
+| Extra `packages/*` dirs not on the allowlist | No | Same check |
+| `source=` host matches that package's `upstream` `host=` | No | Same check |
+| `sha256sums` equals that package's vendor checksums file | No | Same check (`sums_url=` in `packages/<name>/upstream`) |
 | Allowlist does not grow without a human PR | Process only | Required reviews + CODEOWNERS on `allowlist.txt`; bot must not merge |
 | Bot opens bump PRs, never merges | Yes, if configured | Required 1 review from someone other than last pusher; bot **not** on bypass list; auto-merge **off** |
 | No force-push / no deleting `main` | Yes | Branch protection or ruleset |
@@ -85,7 +86,7 @@ Apply after the first CI run on a PR so the check name exists in the picker.
 - Repo secret **`GPG_SECRET_KEY`**: armored private key from `scripts/export-ci-secret.sh --set`. Optional **`GPG_PASSPHRASE`**. Never put these on `pull_request`.
 - Do **not** add `github-actions[bot]` (or a bot PAT) to a ruleset bypass list.
 - Do **not** give the propose workflow `contents: write` on `main`. It pushes a *feature* branch and opens a PR. Required reviews block merge.
-- `publish.yml` runs on `main` / `workflow_dispatch` only. A version-bump PR merge is what publishes `v<pkgver>`. Do not add `pull_request` to that workflow.
+- `publish.yml` runs on `main` / `workflow_dispatch` only. A version-bump PR merge is what publishes `repo-<UTC>` (full db, every allowlisted package). Do not add `pull_request` to that workflow.
 
 ### 3. Branch protection **or** (better) a ruleset
 
@@ -133,8 +134,8 @@ Copy `CODEOWNERS.example` to `CODEOWNERS` at the repo root. Replace the `@REPLAC
 `.github/workflows/propose-update.yml` already:
 
 - Runs on a daily cron + `workflow_dispatch`
-- Rewrites only `packages/keeper-password-manager/PKGBUILD` `pkgver` / `sha256sums` from the vendor file
-- Opens a PR whose body says the human must merge
+- For each allowlisted name, rewrites only that `packages/<name>/PKGBUILD` `pkgver` / `sha256sums` from that package's `upstream` checksums file
+- Opens **one PR per package** whose body says the human must merge
 
 It must **not**:
 
@@ -163,7 +164,7 @@ These are out of GitHub’s reach. Do not tell the broker that “GitHub Enterpr
 
 Safe:
 
-> Vendor Linux packages that Arch does not ship are wrapped in a company git. Merges to the default branch require a pull request, one human approval from someone other than the last pusher, and a passing GitHub Actions check that the PKGBUILD URL is on keepersecurity.com and the SHA-256 equals Keeper’s published SHASUM256.txt. Merge to main publishes a GPG-signed pacman repo as a GitHub Release; laptops install with pacman -S from that HTTPS prefix. The automation that detects new versions may open pull requests only. It cannot merge, cannot add packages, and cannot publish from a pull request. Public AUR is not the update channel.
+> Vendor Linux packages that Arch does not ship are wrapped in a company git. Each package declares its vendor host and checksums URL. Merges to the default branch require a pull request, one human approval from someone other than the last pusher, and a passing GitHub Actions check that every PKGBUILD source URL is on that package’s declared host and the SHA-256 equals the vendor’s published checksums. Merge to main publishes a GPG-signed pacman repo as a GitHub Release; laptops install with pacman -S from that HTTPS prefix. The automation that detects new versions may open pull requests only. It cannot merge, cannot add packages, and cannot publish from a pull request. Public AUR is not the update channel.
 
 Not safe:
 
@@ -183,6 +184,6 @@ Not safe:
 - [ ] Auto-merge off
 - [ ] Propose workflow has opened a dry-run PR (or `workflow_dispatch`) and a human merged it
 - [ ] `GPG_SECRET_KEY` set; `keys/company-arch-packages.asc` and `keys/fingerprint.txt` committed
-- [ ] Repo is **public** (or otherwise anonymously GET-able); first `publish.yml` run created Release `v<keeper pkgver>`
+- [ ] Repo is **public** (or otherwise anonymously GET-able); first `publish.yml` run created Release `repo-<UTC>`
 - [ ] Laptops `enable-repo.sh` + `pacman -S keeper-password-manager` from GitHub Releases, not AUR, not `makepkg -si` from a laptop
 - [ ] Work-standard collector still FAILs `keeper-password-manager` from AUR / `pacman -Qm` foreign names not on the company allowlist

@@ -70,11 +70,11 @@ Nothing is a drop-in “private AUR for two PCs” that you just deploy.
 
 ## Recommended deploy (this repo)
 
-1. Keep PKGBUILDs here. Allowlist: `keeper-password-manager` only.
-2. Cron/Actions: `scripts/propose-keeper-update.sh` fetches SHASUM256.txt, opens a PR if `pkgver` differs.
-3. PR CI: `scripts/verify-pkgbuild.sh` — host allowlist, hash equality, no extra `source=`.
+1. Keep PKGBUILDs here plus `packages/<name>/upstream`. Allowlist starts with `keeper-password-manager`.
+2. Cron/Actions: `scripts/propose-update.sh` fetches each package's checksums file, opens one PR per bump.
+3. PR CI: `scripts/verify-pkgbuild.sh` — host, hash equality, no extra `source=`, no extra package dirs.
 4. Human merge to `main`.
-5. Actions `publish.yml` signs and uploads GitHub Release `v<pkgver>`. Laptops `pacman -S` over HTTPS. Do not `gh release upload` from a machine.
+5. Actions `publish.yml` signs and uploads GitHub Release `repo-<UTC>` (full db). Laptops `pacman -S` over HTTPS. Do not `gh release upload` from a machine.
 
 That is nvchecker + Omarchy-upstream + Chaotic-review, without their infrastructure.
 

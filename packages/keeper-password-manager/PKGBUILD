@@ -18,4 +18,4 @@ package() {
   bsdtar -xf data.tar.* -C "$pkgdir"
 }
 
-# After clone: run ../../scripts/propose-keeper-update.sh to fill pkgver/sha256sums.
+# After clone: run ../../scripts/propose-update.sh keeper-password-manager to fill pkgver/sha256sums.

@@ -1,41 +1,62 @@
 #!/usr/bin/env bash
-# Fail closed: every allowlisted name has a PKGBUILD; Keeper may only fetch
-# the vendor URL and hash from SHASUM256.txt.
+# Fail closed: allowlisted names have PKGBUILD + upstream; extra package dirs
+# fail; each source= host and sha256 match that package's vendor checksums.
 set -euo pipefail
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-ALLOW="$ROOT/allowlist.txt"
-SUMS_URL="https://keepersecurity.com/desktop_electron/SHASUM256.txt"
-HOST_OK='keepersecurity.com'
+_HERE="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=pkg-lib.sh
+source "$_HERE/pkg-lib.sh"
 
-fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
+company_load_gate
 
-mapfile -t pkgs < <(grep -vE '^[[:space:]]*(#|$)' "$ALLOW")
-[[ ${#pkgs[@]} -gt 0 ]] || fail "allowlist empty"
+hostile() {
+  local block=$1
+  echo "$block" | grep -qE 'curl|\|[[:space:]]*bash|wget ' && return 0
+  echo "$block" | grep -qE 'http://' && return 0
+  return 1
+}
 
-for name in "${pkgs[@]}"; do
-  [[ -f "$ROOT/packages/$name/PKGBUILD" ]] || fail "no PKGBUILD for $name"
+verify_one() {
+  local name=$1
+  local pkg up host pkgver sha source_block url count src_host want vendor
+  pkg=$(company_pkgbuild_file "$name")
+  up=$(company_upstream_file "$name")
+  host=$(company_kv_get "$up" host)
+
+  pkgver=$(company_pkgbuild_get "$pkg" pkgver)
+  sha=$(company_pkgbuild_get "$pkg" sha256sums)
+  [[ -n "$pkgver" ]] || company_fail "$name: missing pkgver="
+  [[ "$pkgver" != "0.0.0" ]] || company_fail "$name: pkgver still placeholder — run scripts/propose-update.sh $name"
+  [[ "$sha" =~ ^[0-9a-fA-F]{64}$ ]] || company_fail "$name: sha256sums must be exactly one 64-hex digest (not SKIP)"
+
+  mapfile -t urls < <(company_source_urls "$pkg")
+  count=${#urls[@]}
+  [[ "$count" -eq 1 ]] || company_fail "$name: expected exactly one https source= URL, found $count"
+  url=${urls[0]}
+  src_host=$(company_url_host "$url")
+  company_host_ok "$src_host" "$host" || company_fail "$name: source= host $src_host is not $host"
+
+  source_block=$(awk '/^source=/, /\)/' "$pkg")
+  hostile "$source_block" && company_fail "$name: source= looks hostile"
+
+  local sums_url sums_glob tmp
+  sums_url=$(company_kv_get "$up" sums_url)
+  sums_glob=$(company_kv_get "$up" sums_glob)
+  tmp=$(mktemp)
+  company_fetch "$sums_url" "$tmp" || {
+    rm -f "$tmp"
+    company_fail "$name: could not fetch $sums_url"
+  }
+  want=$(company_expand_glob "$sums_glob" "$pkgver")
+  vendor=$(company_sums_hash_for "$tmp" "$want") || {
+    rm -f "$tmp"
+    company_fail "$name: version $pkgver ($want) not in vendor checksums"
+  }
+  rm -f "$tmp"
+  [[ "${sha,,}" == "${vendor,,}" ]] || company_fail "$name: PKGBUILD sha256 $sha != vendor $vendor"
+
+  printf 'OK %s %s sha256=%s\n' "$name" "$pkgver" "${sha,,}"
+}
+
+for name in "${company_pkgs[@]}"; do
+  verify_one "$name"
 done
-
-grep -qx 'keeper-password-manager' "$ALLOW" || fail "package not in allowlist"
-PKG="$ROOT/packages/keeper-password-manager/PKGBUILD"
-
-pkgver=$(awk -F= '/^pkgver=/ {gsub(/["'\'']/,"",$2); print $2; exit}' "$PKG")
-source_line=$(awk -F= '/^source=/ {print; exit}' "$PKG")
-sha=$(awk -F= '/^sha256sums=/ {gsub(/[("'\'' )]/,"",$2); print $2; exit}' "$PKG")
-
-[[ "$pkgver" != "0.0.0" ]] || fail "pkgver still placeholder — run propose-keeper-update.sh"
-[[ "$source_line" == *"$HOST_OK"* ]] || fail "source= host is not $HOST_OK"
-echo "$source_line" | grep -qE 'curl|\| *bash|http://' && fail "source looks hostile"
-[[ "$sha" != "SKIP" && ${#sha} -eq 64 ]] || fail "sha256sums missing or SKIP"
-
-tmp=$(mktemp)
-trap 'rm -f "$tmp"' EXIT
-curl -fsSL "$SUMS_URL" -o "$tmp"
-vendor=$(awk -v v="$pkgver" '$2 ~ "keeperpasswordmanager_" v "_amd64.deb$" {print $1; exit}' "$tmp")
-[[ -n "$vendor" ]] || fail "version $pkgver not in vendor SHASUM256.txt"
-[[ "$sha" == "$vendor" ]] || fail "PKGBUILD sha256 $sha != vendor $vendor"
-
-src_count=$(grep -cE 'source=\(.*https://' "$PKG" || true)
-[[ "$src_count" -eq 1 ]] || fail "expected exactly one source= URL in PKGBUILD, found $src_count"
-
-printf 'OK keeper-password-manager %s sha256=%s\n' "$pkgver" "$sha"
