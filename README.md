@@ -35,7 +35,7 @@ The bot never merges. The allowlist never grows without a human PR. Packages are
 | `scripts/export-ci-secret.sh` | One-time: `gh secret set GPG_SECRET_KEY` |
 | `scripts/propose-update.sh` | Bump `pkgver` / `sha256sums` from each package's checksums file |
 | `scripts/verify-pkgbuild.sh` | Host + hash gate for every allowlisted name |
-| `scripts/build-repo.sh` | `makepkg --sign` + `repo-add --sign` → `repo/` (CI) |
+| `scripts/build-repo.sh` | `makepkg --nodeps --sign` + `repo-add --sign` → `repo/` (CI) |
 | `scripts/enable-repo.sh` | `pacman-key --lsign-key` + `[company]` HTTPS include |
 | `scripts/gen-nvchecker.sh` | Rebuild `nvchecker.toml` from every `upstream` file |
 | `test/run.sh` | N-package gate tests (no makepkg) |

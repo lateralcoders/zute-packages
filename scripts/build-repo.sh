@@ -28,7 +28,9 @@ for name in "${company_pkgs[@]}"; do
   (
     cd "$dir"
     rm -rf src pkg
-    makepkg -f --clean --sign --key "$fpr"
+    # --nodeps: depends= are for the laptop (gtk3, nss, …), not this builder.
+    # package() only unpacks a vendor .deb; installing a desktop stack in CI is waste.
+    makepkg -f --clean --nodeps --sign --key "$fpr"
     mv -f ./*.pkg.tar.zst "$ROOT/repo/"
     mv -f ./*.pkg.tar.zst.sig "$ROOT/repo/"
   )
