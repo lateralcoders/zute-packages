@@ -36,6 +36,49 @@ company_trim() {
   printf '%s' "$s"
 }
 
+# OWNER/REPO from git origin at $1 (default ROOT). Empty + nonzero if missing/unparseable.
+company_github_nwo() {
+  local root=${1:-$ROOT} url slug
+  url=$(git -C "$root" remote get-url origin 2>/dev/null || true)
+  [[ -n "$url" ]] || return 1
+  url="${url%.git}"
+  url="${url%/}"
+  case "$url" in
+    git@github.com:*) slug="${url#git@github.com:}" ;;
+    ssh://git@github.com/*) slug="${url#ssh://git@github.com/}" ;;
+    https://github.com/*) slug="${url#https://github.com/}" ;;
+    http://github.com/*) slug="${url#http://github.com/}" ;;
+    *) return 1 ;;
+  esac
+  slug="${slug#/}"
+  [[ "$slug" == */* && "$slug" != */*/* ]] || return 1
+  printf '%s\n' "$slug"
+}
+
+# Pacman Server= URL. COMPANY_REPO_SERVER, then git origin, then $root/repo-server.
+company_repo_server() {
+  local root=${1:-$ROOT} line slug
+  if [[ -n "${COMPANY_REPO_SERVER:-}" ]]; then
+    printf '%s\n' "$COMPANY_REPO_SERVER"
+    return 0
+  fi
+  if slug=$(company_github_nwo "$root"); then
+    printf 'https://github.com/%s/releases/latest/download\n' "$slug"
+    return 0
+  fi
+  if [[ -f "$root/repo-server" ]]; then
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      line="${line%$'\r'}"
+      [[ "$line" =~ ^[[:space:]]*(#|$) ]] && continue
+      line=$(company_trim "$line")
+      [[ -n "$line" ]] || continue
+      printf '%s\n' "$line"
+      return 0
+    done <"$root/repo-server"
+  fi
+  return 1
+}
+
 company_allowlist() {
   [[ -f "$ALLOW" ]] || company_fail "missing allowlist.txt"
   local line

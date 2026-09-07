@@ -13,32 +13,12 @@ ASC_TMP=""
 cleanup() { [[ -n "$ASC_TMP" ]] && rm -f "$ASC_TMP"; }
 trap cleanup EXIT
 
-github_nwo() {
-  local url slug
-  url=$(git -C "$ROOT" remote get-url origin 2>/dev/null || true)
-  [[ -n "$url" ]] || return 1
-  url="${url%.git}"
-  url="${url%/}"
-  case "$url" in
-    git@github.com:*) slug="${url#git@github.com:}" ;;
-    ssh://git@github.com/*) slug="${url#ssh://git@github.com/}" ;;
-    https://github.com/*) slug="${url#https://github.com/}" ;;
-    http://github.com/*) slug="${url#http://github.com/}" ;;
-    *) return 1 ;;
-  esac
-  slug="${slug#/}"
-  [[ "$slug" == */* && "$slug" != */*/* ]] || return 1
-  printf '%s\n' "$slug"
-}
-
-if [[ -n "${COMPANY_REPO_SERVER:-}" ]]; then
-  server="$COMPANY_REPO_SERVER"
-elif slug=$(github_nwo); then
-  server="https://github.com/${slug}/releases/latest/download"
+if server=$(company_repo_server); then
+  :
 else
-  echo "set git remote origin to github.com/OWNER/REPO, or COMPANY_REPO_SERVER=" >&2
-  echo "  https://github.com/OWNER/company-arch-packages/releases/latest/download" >&2
-  echo "local test: sudo COMPANY_REPO_SERVER=file://$ROOT/repo $0" >&2
+  echo "set git remote origin to github.com/OWNER/REPO, COMPANY_REPO_SERVER=, or $ROOT/repo-server" >&2
+  echo "  https://github.com/OWNER/REPO/releases/latest/download" >&2
+  echo "USB copy: write-stick.sh writes repo-server. Local test: sudo COMPANY_REPO_SERVER=file://$ROOT/repo $0" >&2
   exit 1
 fi
 

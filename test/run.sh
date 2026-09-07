@@ -40,6 +40,29 @@ if company_valid_pkgname keeper-password-manager; then ok 'pkgname ok'; else bad
 if company_valid_pkgname '../etc'; then bad 'pkgname traversal'; else ok 'pkgname traversal'; fi
 if company_valid_pkgname 'alpha'; then ok 'pkgname alpha'; else bad 'pkgname alpha'; fi
 
+RS=$(mktemp -d)
+printf 'https://github.com/example/repo/releases/latest/download\n' >"$RS/repo-server"
+got=$(COMPANY_REPO_SERVER= company_repo_server "$RS" || true)
+if [[ "$got" == 'https://github.com/example/repo/releases/latest/download' ]]; then
+  ok 'repo-server file'
+else
+  bad "repo-server file: $got"
+fi
+got=$(COMPANY_REPO_SERVER='file:///tmp/repo' company_repo_server "$RS" || true)
+if [[ "$got" == 'file:///tmp/repo' ]]; then
+  ok 'COMPANY_REPO_SERVER overrides repo-server'
+else
+  bad "COMPANY_REPO_SERVER: $got"
+fi
+rm -rf "$RS"
+EMPTY=$(mktemp -d)
+if COMPANY_REPO_SERVER= company_repo_server "$EMPTY" >/dev/null 2>&1; then
+  bad 'repo-server missing should fail'
+else
+  ok 'repo-server missing fails'
+fi
+rmdir "$EMPTY"
+
 H64A=$(printf 'a%.0s' {1..64})
 H64B=$(printf 'b%.0s' {1..64})
 H64C=$(printf 'c%.0s' {1..64})

@@ -1,5 +1,7 @@
 # company-arch-packages
 
+Laptop operators: **[QUICKSTART.md](QUICKSTART.md)**.
+
 Signed **pacman** repo for vendor apps Arch does not ship. First package: **Keeper Desktop** (official `.deb` wrapper).
 
 Sibling of `omarchy-policy-exception` (same parent directory). This is **not** AUR, Chaotic-AUR, Snap, or a second Omarchy.
