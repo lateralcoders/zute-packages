@@ -8,3 +8,8 @@ newver = "nvchecker-new.json"
 source = "regex"
 url = "https://keepersecurity.com/desktop_electron/SHASUM256.txt"
 regex = 'keeperpasswordmanager_([0-9.]+)_amd64\.deb'
+
+[slack-desktop]
+source = "regex"
+url = "https://packagecloud.io/slacktechnologies/slack/debian/dists/jessie/main/binary-amd64/Packages"
+regex = 'slack-desktop_([0-9.]+)_amd64\.deb'

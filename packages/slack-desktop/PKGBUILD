@@ -1,0 +1,28 @@
+# Maintainer: company (not AUR)
+# Binary is Slack's official amd64 .deb. This file unpacks it.
+# Bump pkgver + sha256sums from Slack's packagecloud Packages index.
+# Do not copy PKGBUILDs from aur.archlinux.org.
+
+pkgname=slack-desktop
+pkgver=4.52.155
+pkgrel=1
+pkgdesc='Slack Desktop (vendor .deb wrapper).'
+arch=('x86_64')
+url='https://slack.com/downloads/linux'
+license=('LicenseRef-Slack')
+depends=('gtk3' 'nss' 'libxss' 'libsecret' 'libnotify' 'xdg-utils' 'libxtst' 'at-spi2-core')
+optdepends=('libappindicator-gtk3: tray icon')
+source=("https://downloads.slack-edge.com/desktop-releases/linux/x64/${pkgver}/slack-desktop-${pkgver}-amd64.deb")
+sha256sums=('966536026f5afcd1c75a395dddd87b9596580931f659b40cebb21ab3add71b2f')
+
+package() {
+  bsdtar -xf data.tar.* -C "$pkgdir"
+  # Debian apt-repo cron: writes /etc/apt and packagecloud keys. Not for Arch.
+  rm -rf "$pkgdir/etc"
+  local desktop="$pkgdir/usr/share/applications/slack.desktop"
+  if [[ -f "$desktop" ]]; then
+    sed -i 's|^Exec=.*|Exec=/usr/bin/slack --enable-features=WaylandWindowDecorations --ozone-platform-hint=auto --gtk-version=3 -s %U|' "$desktop"
+  fi
+}
+
+# After clone: run ../../scripts/propose-update.sh slack-desktop to fill pkgver/sha256sums.

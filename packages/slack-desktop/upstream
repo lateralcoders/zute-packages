@@ -1,0 +1,12 @@
+# Vendor checksum gate. Required next to PKGBUILD.
+# host: PKGBUILD source= URL must be this FQDN or a subdomain.
+# sums_url: Slack's Debian Packages index (SHA256 per .deb). Not a sha256sum file.
+# sums_host: checksums live on packagecloud; the .deb is on slack-edge.
+# sums_glob: basename in Filename:; {pkgver} is substituted for verify.
+# version_regex: capture group 1 is the version (propose + nvchecker).
+host=slack-edge.com
+sums_host=packagecloud.io
+sums_url=https://packagecloud.io/slacktechnologies/slack/debian/dists/jessie/main/binary-amd64/Packages
+sums_format=debian-packages
+sums_glob=slack-desktop_{pkgver}_amd64.deb
+version_regex=slack-desktop_([0-9.]+)_amd64\.deb
