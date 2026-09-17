@@ -20,30 +20,37 @@ in_allowlist() {
 
 propose_one() {
   local name=$1
-  local pkg up sums_url sums_glob version_regex tmp latest cur sha want
+  local pkg up sums_url sums_glob version_regex tmp latest cur sha want format norm
   in_allowlist "$name" || company_fail "$name is not in allowlist.txt"
   pkg=$(company_pkgbuild_file "$name")
   up=$(company_upstream_file "$name")
   sums_url=$(company_kv_get "$up" sums_url)
   sums_glob=$(company_kv_get "$up" sums_glob)
   version_regex=$(company_kv_get "$up" version_regex)
+  format=$(company_sums_format "$up")
 
   tmp=$(mktemp)
   company_fetch "$sums_url" "$tmp" || {
     rm -f "$tmp"
     company_fail "$name: could not fetch $sums_url"
   }
-  latest=$(company_versions_from_sums "$tmp" "$version_regex" | tail -n1)
+  norm=$(mktemp)
+  company_sums_as_sha256sum "$tmp" "$format" >"$norm" || {
+    rm -f "$tmp" "$norm"
+    company_fail "$name: unknown sums_format=$format"
+  }
+  rm -f "$tmp"
+  latest=$(company_versions_from_sums "$norm" "$version_regex" | tail -n1)
   [[ -n "$latest" ]] || {
-    rm -f "$tmp"
+    rm -f "$norm"
     company_fail "$name: no versions matched version_regex in checksums"
   }
   want=$(company_expand_glob "$sums_glob" "$latest")
-  sha=$(company_sums_hash_for "$tmp" "$want") || {
-    rm -f "$tmp"
+  sha=$(company_sums_hash_for "$norm" "$want") || {
+    rm -f "$norm"
     company_fail "$name: latest $latest ($want) has no sha256 line"
   }
-  rm -f "$tmp"
+  rm -f "$norm"
   [[ ${#sha} -eq 64 ]] || company_fail "$name: parse failed for $want"
 
   cur=$(company_pkgbuild_get "$pkg" pkgver)

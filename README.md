@@ -2,7 +2,7 @@
 
 Laptop operators: **[QUICKSTART.md](QUICKSTART.md)**.
 
-Signed **pacman** repo for vendor apps Arch does not ship. First package: **Keeper Desktop** (official `.deb` wrapper).
+Signed **pacman** repo for vendor apps Arch does not ship. Packages: **Keeper Desktop** and **Slack Desktop** (official `.deb` wrappers).
 
 Sibling of `omarchy-policy-exception` (same parent directory). This is **not** AUR, Chaotic-AUR, Snap, or a second Omarchy.
 
@@ -32,7 +32,7 @@ The bot never merges. The allowlist never grows without a human PR. Packages are
 |---|---|
 | `allowlist.txt` | Only these names may have a PKGBUILD. Extra `packages/*` dirs fail CI |
 | `packages/<name>/PKGBUILD` | Wrapper (Keeper unpacks vendor `.deb`) |
-| `packages/<name>/upstream` | Vendor `host`, checksums URL, filename glob, version regex |
+| `packages/<name>/upstream` | Vendor `host`, checksums URL, filename glob, version regex; optional `sums_host`, `sums_format` |
 | `scripts/init-signing-key.sh` | One-time GnuPG key; public half in `keys/` |
 | `scripts/export-ci-secret.sh` | One-time: `gh secret set GPG_SECRET_KEY` |
 | `scripts/propose-update.sh` | Bump `pkgver` / `sha256sums` from each package's checksums file |
@@ -75,7 +75,7 @@ PRs never see `GPG_SECRET_KEY`. Forks cannot publish.
 
 ```bash
 sudo ../company-arch-packages/scripts/enable-repo.sh
-sudo pacman -S keeper-password-manager
+sudo pacman -S keeper-password-manager slack-desktop
 ```
 
 `enable-repo.sh` infers `origin` and writes
@@ -104,12 +104,14 @@ Do **not** put this repo or `.pkg.tar.zst` on the day-one USB. That stick is ISO
 | `gh release upload` from a laptop | That is what `publish.yml` is for |
 | Sign on `pull_request` | Secret exfil from a fork PR |
 
-## Adding a second vendor app
+## Adding another vendor app
 
 Same human PR, all of:
 
 1. `packages/<name>/PKGBUILD`
-2. `packages/<name>/upstream` (`host`, `sums_url`, `sums_glob`, `version_regex`; optional `sums_host` if checksums are on another FQDN)
+2. `packages/<name>/upstream` (`host`, `sums_url`, `sums_glob`, `version_regex`; optional `sums_host` if checksums are on another FQDN; optional `sums_format=debian-packages` if the vendor publishes a Debian `Packages` index instead of a `sha256sum` file)
 3. Add the name to `allowlist.txt`
+
+`sums_format` defaults to `sha256sum` (Keeper). Slack uses `debian-packages`: CI converts `Filename:` + `SHA256:` stanzas into the same hash check.
 
 CI fails names not on the list, `packages/*` dirs not on the list, missing `upstream`, `source=` host mismatch, and sha256 ≠ vendor checksums. Merge to `main` republishes the whole `[company]` db. The bot may later bump that PKGBUILD; it cannot add the name.
