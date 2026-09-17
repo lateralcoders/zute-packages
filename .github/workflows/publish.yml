@@ -20,7 +20,7 @@ on:
 
 concurrency:
   group: publish-company-repo
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -30,13 +30,14 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     container: archlinux:base-devel
+    timeout-minutes: 45
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: pacman
         run: |
           pacman -Sy --noconfirm archlinux-keyring
-          pacman -Syu --noconfirm --needed git gnupg github-cli sudo fakeroot debugedit
+          pacman -Syu --noconfirm --needed git gnupg github-cli sudo fakeroot debugedit curl
 
       - uses: actions/checkout@v4
 
@@ -78,4 +79,6 @@ jobs:
             GH_TOKEN="$GITHUB_TOKEN" \
             GITHUB_TOKEN="$GITHUB_TOKEN" \
             GITHUB_REPOSITORY="$GITHUB_REPOSITORY" \
+            GITHUB_RUN_ID="$GITHUB_RUN_ID" \
+            GITHUB_SHA="$GITHUB_SHA" \
             bash scripts/publish-github-release.sh
