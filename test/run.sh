@@ -172,6 +172,72 @@ else
   bad "propose all output: $(tr '\n' ' ' </tmp/cap-out)"
 fi
 
+write_deb_pkg() {
+  local root=$1 name=$2 ver=$3 sha=$4 host=$5
+  mkdir -p "$root/packages/$name" "$root/sums"
+  cat >"$root/packages/$name/PKGBUILD" <<EOF
+pkgname=$name
+pkgver=$ver
+pkgrel=1
+arch=('x86_64')
+source=("https://${host}/${name}-\${pkgver}-amd64.deb")
+sha256sums=('$sha')
+EOF
+  cat >"$root/packages/$name/upstream" <<EOF
+host=$host
+sums_host=index.example
+sums_url=file://${root}/sums/${name}.packages
+sums_format=debian-packages
+sums_glob=${name}_{pkgver}_amd64.deb
+version_regex=${name}_([0-9.]+)_amd64\\.deb
+EOF
+}
+
+write_deb_packages() {
+  local file=$1
+  shift
+  : >"$file"
+  while [[ $# -ge 3 ]]; do
+    local ver=$1 sha=$2 fn=$3
+    shift 3
+    cat >>"$file" <<EOF
+Package: slack-desktop
+Filename: pool/jessie/main/s/x/${fn}
+SHA256: ${sha}
+
+EOF
+  done
+}
+
+DEB=$(mktemp -d)
+write_deb_pkg "$DEB" gamma 4.50.0 "$H64A" downloads.slack-edge.com
+write_deb_packages "$DEB/sums/gamma.packages" \
+  4.50.0 "$H64A" 'gamma_4.50.0_amd64.deb' \
+  4.52.155 "$H64B" 'gamma_4.52.155_amd64.deb'
+write_allow "$DEB" gamma
+
+expect_ok 'debian-packages verify' verify "$DEB"
+
+sed -i "s/^sha256sums=.*/sha256sums=('$H64D')/" "$DEB/packages/gamma/PKGBUILD"
+expect_fail 'debian-packages hash mismatch' 'sha256' verify "$DEB"
+sed -i "s/^sha256sums=.*/sha256sums=('$H64A')/" "$DEB/packages/gamma/PKGBUILD"
+
+expect_ok 'debian-packages propose' propose "$DEB" gamma
+if grep -q '^pkgver=4.52.155$' "$DEB/packages/gamma/PKGBUILD"; then
+  ok 'debian-packages bumped to 4.52.155'
+else
+  bad "gamma pkgver=$(company_pkgbuild_get "$DEB/packages/gamma/PKGBUILD" pkgver)"
+fi
+if grep -q "sha256sums=('$H64B')" "$DEB/packages/gamma/PKGBUILD"; then
+  ok 'debian-packages sha follows Packages SHA256'
+else
+  bad 'debian-packages sha not latest'
+fi
+
+sed -i 's/^sums_format=.*/sums_format=nope/' "$DEB/packages/gamma/upstream"
+expect_fail 'unknown sums_format' 'sums_format' verify "$DEB"
+rm -rf "$DEB"
+
 expect_ok 'real allowlist PKGBUILDs' bash "$REPO/scripts/verify-pkgbuild.sh"
 
 printf '%s passed, %s failed\n' "$PASS" "$FAIL"

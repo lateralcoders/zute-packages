@@ -181,6 +181,66 @@ company_expand_glob() {
   printf '%s\n' "${glob//\{pkgver\}/$ver}"
 }
 
+# sums_format= in upstream. Default sha256sum (Keeper). debian-packages for apt Packages.
+company_sums_format() {
+  local up=$1 f
+  f=$(company_kv_get "$up" sums_format) || true
+  f=$(company_trim "$f")
+  [[ -n "$f" ]] || f=sha256sum
+  printf '%s\n' "$f"
+}
+
+# Debian Packages stanzas -> sha256sum lines (HASH  basename).
+company_debian_packages_to_sha256sum() {
+  awk '
+    function trim(s) {
+      sub(/\r$/, "", s)
+      sub(/^[[:space:]]+/, "", s)
+      sub(/[[:space:]]+$/, "", s)
+      return s
+    }
+    function emit() {
+      if (sha ~ /^[0-9a-fA-F]{64}$/ && fn != "") {
+        n = fn
+        sub(/^.*\//, "", n)
+        print tolower(sha) "  " n
+      }
+      sha = ""
+      fn = ""
+    }
+    /^Filename:/ {
+      line = $0
+      sub(/^Filename:/, "", line)
+      fn = trim(line)
+      next
+    }
+    /^SHA256:/ {
+      line = $0
+      sub(/^SHA256:/, "", line)
+      sha = trim(line)
+      next
+    }
+    /^[[:space:]]*$/ { emit(); next }
+    END { emit() }
+  ' "$1"
+}
+
+# Print vendor checksums as sha256sum lines. format is sha256sum or debian-packages.
+company_sums_as_sha256sum() {
+  local src=$1 format=$2
+  case "$format" in
+    sha256sum)
+      cat "$src"
+      ;;
+    debian-packages)
+      company_debian_packages_to_sha256sum "$src"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 # SHA-256 from a sha256sum-format file for an exact basename.
 company_sums_hash_for() {
   local sums_file=$1 want=$2
@@ -217,7 +277,7 @@ company_fetch() {
 
 company_require_upstream() {
   local name=$1
-  local up host sums_url sums_glob version_regex sums_host
+  local up host sums_url sums_glob version_regex sums_host sums_format
   up=$(company_upstream_file "$name")
   [[ -f "$up" ]] || company_fail "$name: missing packages/$name/upstream"
   host=$(company_kv_get "$up" host) || true
@@ -225,6 +285,11 @@ company_require_upstream() {
   sums_glob=$(company_kv_get "$up" sums_glob) || true
   version_regex=$(company_kv_get "$up" version_regex) || true
   sums_host=$(company_kv_get "$up" sums_host) || true
+  sums_format=$(company_sums_format "$up")
+  case "$sums_format" in
+    sha256sum|debian-packages) ;;
+    *) company_fail "$name: sums_format must be sha256sum or debian-packages (got $sums_format)" ;;
+  esac
   [[ -n "$host" ]] || company_fail "$name: upstream missing host="
   [[ -n "$sums_url" ]] || company_fail "$name: upstream missing sums_url="
   [[ -n "$sums_glob" ]] || company_fail "$name: upstream missing sums_glob="

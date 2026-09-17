@@ -17,10 +17,11 @@ hostile() {
 
 verify_one() {
   local name=$1
-  local pkg up host pkgver sha source_block url count src_host want vendor
+  local pkg up host pkgver sha source_block url count src_host want vendor format
   pkg=$(company_pkgbuild_file "$name")
   up=$(company_upstream_file "$name")
   host=$(company_kv_get "$up" host)
+  format=$(company_sums_format "$up")
 
   pkgver=$(company_pkgbuild_get "$pkg" pkgver)
   sha=$(company_pkgbuild_get "$pkg" sha256sums)
@@ -46,12 +47,19 @@ verify_one() {
     rm -f "$tmp"
     company_fail "$name: could not fetch $sums_url"
   }
-  want=$(company_expand_glob "$sums_glob" "$pkgver")
-  vendor=$(company_sums_hash_for "$tmp" "$want") || {
-    rm -f "$tmp"
-    company_fail "$name: version $pkgver ($want) not in vendor checksums"
+  local norm
+  norm=$(mktemp)
+  company_sums_as_sha256sum "$tmp" "$format" >"$norm" || {
+    rm -f "$tmp" "$norm"
+    company_fail "$name: unknown sums_format=$format"
   }
   rm -f "$tmp"
+  want=$(company_expand_glob "$sums_glob" "$pkgver")
+  vendor=$(company_sums_hash_for "$norm" "$want") || {
+    rm -f "$norm"
+    company_fail "$name: version $pkgver ($want) not in vendor checksums"
+  }
+  rm -f "$norm"
   [[ "${sha,,}" == "${vendor,,}" ]] || company_fail "$name: PKGBUILD sha256 $sha != vendor $vendor"
 
   printf 'OK %s %s sha256=%s\n' "$name" "$pkgver" "${sha,,}"
