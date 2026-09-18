@@ -47,14 +47,14 @@ verify_one() {
     rm -f "$tmp"
     company_fail "$name: could not fetch $sums_url"
   }
-  local norm
+  local norm want
+  want=$(company_expand_glob "$sums_glob" "$pkgver")
   norm=$(mktemp)
-  company_sums_as_sha256sum "$tmp" "$format" >"$norm" || {
+  company_sums_as_sha256sum "$tmp" "$format" "$want" >"$norm" || {
     rm -f "$tmp" "$norm"
     company_fail "$name: unknown sums_format=$format"
   }
   rm -f "$tmp"
-  want=$(company_expand_glob "$sums_glob" "$pkgver")
   vendor=$(company_sums_hash_for "$norm" "$want") || {
     rm -f "$norm"
     company_fail "$name: version $pkgver ($want) not in vendor checksums"

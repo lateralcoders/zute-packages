@@ -1,0 +1,8 @@
+# Vendor checksum gate. Required next to PKGBUILD.
+# Brother does not publish a SHA-256 catalog. sums_url is the official RPM;
+# verify hashes that file and checks it matches PKGBUILD sha256sums.
+host=download.brother.com
+sums_url=https://download.brother.com/welcome/dlf103221/hll9310cdwcupswrapper-1.5.0-3.i386.rpm
+sums_format=sha256-of-url
+sums_glob=hll9310cdwcupswrapper-{pkgver}-3.i386.rpm
+version_regex=hll9310cdwcupswrapper-([0-9.]+)-3\.i386\.rpm

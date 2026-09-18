@@ -1,0 +1,35 @@
+# Maintainer: company (not AUR)
+# Official Brother CUPSwrapper RPM for HL-L9310CDW. Unpack + CUPS filter symlink.
+# Do not run Brother's cupswrapper -i (it lpadmins and restarts cups).
+# Bump pkgver / _brother_rel / sha256sums from the same URL on download.brother.com.
+
+pkgname=brother-hll9310cdw-cups
+pkgver=1.5.0
+_brother_rel=3
+pkgrel=1
+pkgdesc='Brother HL-L9310CDW CUPS wrapper (vendor rpm wrapper).'
+arch=('x86_64')
+url='https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=hll9310cdw_all'
+license=('LicenseRef-Brother')
+depends=('brother-hll9310cdw-lpr' 'cups' 'perl')
+source=("https://download.brother.com/welcome/dlf103221/hll9310cdwcupswrapper-${pkgver}-${_brother_rel}.i386.rpm")
+sha256sums=('f2ec8695f8e1f0520e420b3a5b13c66caa768f3bc1277b972d75350d2962fc8d')
+noextract=("hll9310cdwcupswrapper-${pkgver}-${_brother_rel}.i386.rpm")
+options=('!strip')
+install=brother-hll9310cdw-cups.install
+
+package() {
+  bsdtar -xf "hll9310cdwcupswrapper-${pkgver}-${_brother_rel}.i386.rpm" -C "$pkgdir"
+  local wrap="$pkgdir/opt/brother/Printers/hll9310cdw/cupswrapper"
+  chmod 755 "$wrap/brother_lpdwrapper_hll9310cdw"
+
+  # cups-filters 2 treats cupsFilter cost 0 as "printer-native". Force the wrapper to run.
+  sed -i 's|application/vnd.cups-postscript 0 brother_lpdwrapper_hll9310cdw|application/vnd.cups-postscript 100 brother_lpdwrapper_hll9310cdw|' \
+    "$wrap/brother_hll9310cdw_printer_en.ppd"
+
+  install -d "$pkgdir/usr/lib/cups/filter" "$pkgdir/usr/share/ppd/Brother"
+  ln -s /opt/brother/Printers/hll9310cdw/cupswrapper/brother_lpdwrapper_hll9310cdw \
+    "$pkgdir/usr/lib/cups/filter/brother_lpdwrapper_hll9310cdw"
+  ln -s /opt/brother/Printers/hll9310cdw/cupswrapper/brother_hll9310cdw_printer_en.ppd \
+    "$pkgdir/usr/share/ppd/Brother/brother_hll9310cdw_printer_en.ppd"
+}

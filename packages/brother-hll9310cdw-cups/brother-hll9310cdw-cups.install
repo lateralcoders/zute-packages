@@ -1,0 +1,16 @@
+post_install() {
+  cat <<'EOF'
+brother-hll9310cdw-cups: add the printer (replace PRINTER_IP):
+
+  sudo lpadmin -p Brother_HL-L9310CDW -E \
+    -v lpd://PRINTER_IP/BINARY_P1 \
+    -P /usr/share/ppd/Brother/brother_hll9310cdw_printer_en.ppd
+  sudo lpoptions -d Brother_HL-L9310CDW
+
+That URI is Brother's documented network queue, not IPP Everywhere.
+EOF
+}
+
+post_upgrade() {
+  post_install
+}

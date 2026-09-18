@@ -2,3 +2,5 @@
 # Adding a name requires a human PR. CI fails packages not listed.
 keeper-password-manager
 slack-desktop
+brother-hll9310cdw-lpr
+brother-hll9310cdw-cups
