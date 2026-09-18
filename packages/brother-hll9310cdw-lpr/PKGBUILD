@@ -1,0 +1,28 @@
+# Maintainer: company (not AUR)
+# Official Brother LPR RPM for HL-L9310CDW. Unpack only; do not copy AUR PKGBUILDs.
+# Bump pkgver / _brother_rel / sha256sums from the same URL on download.brother.com.
+
+pkgname=brother-hll9310cdw-lpr
+pkgver=1.5.0
+_brother_rel=3
+pkgrel=1
+pkgdesc='Brother HL-L9310CDW LPR filter (vendor rpm wrapper).'
+arch=('x86_64')
+url='https://support.brother.com/g/b/producttop.aspx?c=us&lang=en&prod=hll9310cdw_all'
+license=('LicenseRef-Brother')
+depends=('perl' 'ghostscript')
+source=("https://download.brother.com/welcome/dlf103212/hll9310cdwlpr-${pkgver}-${_brother_rel}.i386.rpm")
+sha256sums=('4cf0b65f54360edf7e69823506e0e4bba19d905e826343c4918eb33868c27335')
+noextract=("hll9310cdwlpr-${pkgver}-${_brother_rel}.i386.rpm")
+options=('!strip')
+
+package() {
+  bsdtar -xf "hll9310cdwlpr-${pkgver}-${_brother_rel}.i386.rpm" -C "$pkgdir"
+  local lpd="$pkgdir/opt/brother/Printers/hll9310cdw/lpd"
+  # Official RPM ships arch-specific binaries; the perl filter expects these names.
+  ln -s x86_64/brhll9310cdwfilter "$lpd/brhll9310cdwfilter"
+  ln -s x86_64/brprintconf_hll9310cdw "$lpd/brprintconf_hll9310cdw"
+  chmod 755 "$lpd/filter_hll9310cdw" \
+    "$lpd/x86_64/brhll9310cdwfilter" \
+    "$lpd/x86_64/brprintconf_hll9310cdw"
+}

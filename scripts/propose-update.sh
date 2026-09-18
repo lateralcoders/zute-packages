@@ -20,7 +20,7 @@ in_allowlist() {
 
 propose_one() {
   local name=$1
-  local pkg up sums_url sums_glob version_regex tmp latest cur sha want format norm
+  local pkg up sums_url sums_glob version_regex tmp latest cur sha want format norm url_base
   in_allowlist "$name" || company_fail "$name is not in allowlist.txt"
   pkg=$(company_pkgbuild_file "$name")
   up=$(company_upstream_file "$name")
@@ -34,8 +34,10 @@ propose_one() {
     rm -f "$tmp"
     company_fail "$name: could not fetch $sums_url"
   }
+  local url_base
+  url_base=$(basename "${sums_url%%\?*}")
   norm=$(mktemp)
-  company_sums_as_sha256sum "$tmp" "$format" >"$norm" || {
+  company_sums_as_sha256sum "$tmp" "$format" "$url_base" >"$norm" || {
     rm -f "$tmp" "$norm"
     company_fail "$name: unknown sums_format=$format"
   }

@@ -13,3 +13,13 @@ regex = 'keeperpasswordmanager_([0-9.]+)_amd64\.deb'
 source = "regex"
 url = "https://packagecloud.io/slacktechnologies/slack/debian/dists/jessie/main/binary-amd64/Packages"
 regex = 'slack-desktop_([0-9.]+)_amd64\.deb'
+
+[brother-hll9310cdw-lpr]
+source = "regex"
+url = "https://download.brother.com/welcome/dlf103212/hll9310cdwlpr-1.5.0-3.i386.rpm"
+regex = 'hll9310cdwlpr-([0-9.]+)-3\.i386\.rpm'
+
+[brother-hll9310cdw-cups]
+source = "regex"
+url = "https://download.brother.com/welcome/dlf103221/hll9310cdwcupswrapper-1.5.0-3.i386.rpm"
+regex = 'hll9310cdwcupswrapper-([0-9.]+)-3\.i386\.rpm'

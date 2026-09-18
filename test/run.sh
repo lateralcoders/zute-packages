@@ -238,6 +238,32 @@ sed -i 's/^sums_format=.*/sums_format=nope/' "$DEB/packages/gamma/upstream"
 expect_fail 'unknown sums_format' 'sums_format' verify "$DEB"
 rm -rf "$DEB"
 
+ART=$(mktemp -d)
+mkdir -p "$ART/sums"
+printf 'brother-rpm-body\n' >"$ART/sums/delta_1.0.bin"
+ART_SHA=$(sha256sum "$ART/sums/delta_1.0.bin" | awk '{print $1}')
+mkdir -p "$ART/packages/delta"
+cat >"$ART/packages/delta/PKGBUILD" <<EOF
+pkgname=delta
+pkgver=1.0
+pkgrel=1
+arch=('x86_64')
+source=("https://download.brother.com/welcome/delta_\${pkgver}.bin")
+sha256sums=('$ART_SHA')
+EOF
+cat >"$ART/packages/delta/upstream" <<EOF
+host=download.brother.com
+sums_url=file://${ART}/sums/delta_1.0.bin
+sums_format=sha256-of-url
+sums_glob=delta_{pkgver}.bin
+version_regex=delta_([0-9.]+)\\.bin
+EOF
+write_allow "$ART" delta
+expect_ok 'sha256-of-url verify' verify "$ART"
+sed -i "s/^sha256sums=.*/sha256sums=('$H64D')/" "$ART/packages/delta/PKGBUILD"
+expect_fail 'sha256-of-url hash mismatch' 'sha256' verify "$ART"
+rm -rf "$ART"
+
 expect_ok 'real allowlist PKGBUILDs' bash "$REPO/scripts/verify-pkgbuild.sh"
 
 printf '%s passed, %s failed\n' "$PASS" "$FAIL"
