@@ -184,6 +184,7 @@ company_expand_glob() {
 # sums_format= in upstream. Default sha256sum (Keeper). debian-packages for apt
 # Packages. sha256-of-url for vendors that publish the artifact but no checksums file
 # (hash the fetched sums_url body; basename is the optional 3rd arg).
+# github-release for a GitHub Releases API document (asset name + digest sha256).
 company_sums_format() {
   local up=$1 f
   f=$(company_kv_get "$up" sums_format) || true
@@ -227,8 +228,38 @@ company_debian_packages_to_sha256sum() {
   ' "$1"
 }
 
+# GitHub Releases API JSON -> sha256sum lines (HASH  asset name).
+# Each asset object has "name" before "digest". The uploader object has no "name".
+# Assets without a sha256 digest are skipped. $3 is unused.
+company_github_release_to_sha256sum() {
+  awk '
+    { buf = buf $0 "\n" }
+    END {
+      s = buf
+      gsub(/\n/, " ", s)
+      while (match(s, /"digest"[[:space:]]*:[[:space:]]*"sha256:[0-9a-fA-F]{64}"/)) {
+        dstart = RSTART
+        dlen = RLENGTH
+        token = substr(s, dstart, dlen)
+        hex = token
+        sub(/.*sha256:/, "", hex)
+        sub(/".*/, "", hex)
+        prefix = substr(s, 1, dstart - 1)
+        name = ""
+        if (match(prefix, /.*"name"[[:space:]]*:[[:space:]]*"[^"]*"/)) {
+          name = substr(prefix, RSTART, RLENGTH)
+          sub(/.*"name"[[:space:]]*:[[:space:]]*"/, "", name)
+          sub(/"$/, "", name)
+        }
+        if (name != "") print tolower(hex) "  " name
+        s = substr(s, dstart + dlen)
+      }
+    }
+  ' "$1"
+}
+
 # Print vendor checksums as sha256sum lines.
-# format: sha256sum | debian-packages | sha256-of-url
+# format: sha256sum | debian-packages | sha256-of-url | github-release
 # For sha256-of-url, $3 is the basename written on the line (required).
 company_sums_as_sha256sum() {
   local src=$1 format=$2 base=${3:-}
@@ -242,6 +273,9 @@ company_sums_as_sha256sum() {
     sha256-of-url)
       [[ -n "$base" ]] || return 1
       printf '%s  %s\n' "$(sha256sum "$src" | awk '{print $1}')" "$base"
+      ;;
+    github-release)
+      company_github_release_to_sha256sum "$src"
       ;;
     *)
       return 1
@@ -295,8 +329,8 @@ company_require_upstream() {
   sums_host=$(company_kv_get "$up" sums_host) || true
   sums_format=$(company_sums_format "$up")
   case "$sums_format" in
-    sha256sum|debian-packages|sha256-of-url) ;;
-    *) company_fail "$name: sums_format must be sha256sum, debian-packages, or sha256-of-url (got $sums_format)" ;;
+    sha256sum|debian-packages|sha256-of-url|github-release) ;;
+    *) company_fail "$name: sums_format must be sha256sum, debian-packages, sha256-of-url, or github-release (got $sums_format)" ;;
   esac
   [[ -n "$host" ]] || company_fail "$name: upstream missing host="
   [[ -n "$sums_url" ]] || company_fail "$name: upstream missing sums_url="

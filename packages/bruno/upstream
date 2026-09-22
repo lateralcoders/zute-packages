@@ -1,0 +1,15 @@
+# Vendor checksum gate. Required next to PKGBUILD.
+# host: PKGBUILD source= URL must be this FQDN or a subdomain.
+# sums_url: GitHub Releases API for the latest stable release (asset digests).
+# sums_host: checksums live on api.github.com; the .deb is on github.com.
+# sums_format: github-release reads asset "name" + "digest": "sha256:..."
+#   Bruno's apt repo is http://debian.usebruno.com (rejected: not https).
+#   latest-linux.yml publishes sha512, not sha256.
+# sums_glob: asset name; {pkgver} is substituted for verify.
+# version_regex: capture group 1 is the version (propose + nvchecker).
+host=github.com
+sums_host=api.github.com
+sums_url=https://api.github.com/repos/usebruno/bruno/releases/latest
+sums_format=github-release
+sums_glob=bruno_{pkgver}_amd64_linux.deb
+version_regex=bruno_([0-9.]+)_amd64_linux\.deb

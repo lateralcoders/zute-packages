@@ -264,6 +264,64 @@ sed -i "s/^sha256sums=.*/sha256sums=('$H64D')/" "$ART/packages/delta/PKGBUILD"
 expect_fail 'sha256-of-url hash mismatch' 'sha256' verify "$ART"
 rm -rf "$ART"
 
+GH=$(mktemp -d)
+mkdir -p "$GH/packages/epsilon" "$GH/sums"
+cat >"$GH/sums/release.json" <<EOF
+{
+  "name": "",
+  "assets": [
+    {
+      "name": "epsilon_1.0.0_amd64_linux.deb",
+      "uploader": { "login": "engineering" },
+      "digest": "sha256:${H64A}"
+    },
+    {
+      "name": "epsilon_1.2.0_amd64_linux.deb",
+      "uploader": { "login": "engineering", "url": "https://api.github.com/users/engineering" },
+      "digest": "sha256:${H64B}"
+    },
+    {
+      "name": "epsilon_1.2.0_amd64_linux.rpm",
+      "digest": "sha256:${H64C}"
+    },
+    { "name": "notes.txt", "size": 1 }
+  ]
+}
+EOF
+cat >"$GH/packages/epsilon/PKGBUILD" <<EOF
+pkgname=epsilon
+pkgver=1.0.0
+pkgrel=1
+arch=('x86_64')
+source=("https://github.com/example/epsilon/releases/download/v\${pkgver}/epsilon_\${pkgver}_amd64_linux.deb")
+sha256sums=('$H64A')
+EOF
+cat >"$GH/packages/epsilon/upstream" <<EOF
+host=github.com
+sums_host=api.github.com
+sums_url=file://${GH}/sums/release.json
+sums_format=github-release
+sums_glob=epsilon_{pkgver}_amd64_linux.deb
+version_regex=epsilon_([0-9.]+)_amd64_linux\\.deb
+EOF
+write_allow "$GH" epsilon
+expect_ok 'github-release verify' verify "$GH"
+sed -i "s/^sha256sums=.*/sha256sums=('$H64D')/" "$GH/packages/epsilon/PKGBUILD"
+expect_fail 'github-release hash mismatch' 'sha256' verify "$GH"
+sed -i "s/^sha256sums=.*/sha256sums=('$H64A')/" "$GH/packages/epsilon/PKGBUILD"
+expect_ok 'github-release propose' propose "$GH" epsilon
+if grep -q '^pkgver=1.2.0$' "$GH/packages/epsilon/PKGBUILD"; then
+  ok 'github-release bumped to 1.2.0'
+else
+  bad "epsilon pkgver=$(company_pkgbuild_get "$GH/packages/epsilon/PKGBUILD" pkgver)"
+fi
+if grep -q "sha256sums=('$H64B')" "$GH/packages/epsilon/PKGBUILD"; then
+  ok 'github-release sha is the deb digest, not the rpm'
+else
+  bad 'github-release sha not the deb digest'
+fi
+rm -rf "$GH"
+
 expect_ok 'real allowlist PKGBUILDs' bash "$REPO/scripts/verify-pkgbuild.sh"
 
 printf '%s passed, %s failed\n' "$PASS" "$FAIL"

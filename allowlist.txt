@@ -4,3 +4,4 @@ keeper-password-manager
 slack-desktop
 brother-hll9310cdw-lpr
 brother-hll9310cdw-cups
+bruno

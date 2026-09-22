@@ -1,0 +1,32 @@
+# Maintainer: company (not AUR)
+# Binary is Bruno's official amd64 .deb. This file unpacks it.
+# Bump pkgver + sha256sums from the GitHub Releases asset digest.
+# Do not copy PKGBUILDs from aur.archlinux.org.
+
+pkgname=bruno
+pkgver=4.1.0
+pkgrel=1
+pkgdesc='Bruno API client (vendor .deb wrapper).'
+arch=('x86_64')
+url='https://www.usebruno.com/'
+license=('MIT')
+depends=('gtk3' 'libnotify' 'nss' 'libxss' 'libxtst' 'xdg-utils' 'at-spi2-core' 'util-linux-libs' 'libsecret' 'alsa-lib')
+optdepends=('libappindicator-gtk3: tray icon')
+# Vendor Electron binaries. Do not strip them or attach a debug package.
+options=('!strip' '!debug')
+source=("https://github.com/usebruno/bruno/releases/download/v${pkgver}/bruno_${pkgver}_amd64_linux.deb")
+sha256sums=('164f5181df081e493229306f00f1b68772a544c1ebc22c46f0eb6836f8a251f8')
+
+package() {
+  bsdtar -xf data.tar.* -C "$pkgdir"
+  # Debian postinst creates this with update-alternatives. Ship the symlink.
+  install -dm755 "$pkgdir/usr/bin"
+  ln -s /opt/Bruno/bruno "$pkgdir/usr/bin/bruno"
+  chmod 4755 "$pkgdir/opt/Bruno/chrome-sandbox"
+  # Native Wayland on Omarchy. Vendor Exec is /opt/Bruno/bruno %U.
+  local desktop="$pkgdir/usr/share/applications/bruno.desktop"
+  [[ -f "$desktop" ]]
+  sed -i 's|^Exec=.*|Exec=/opt/Bruno/bruno --enable-features=WaylandWindowDecorations --ozone-platform-hint=auto --gtk-version=3 %U|' "$desktop"
+}
+
+# After clone: run ../../scripts/propose-update.sh bruno to fill pkgver/sha256sums.

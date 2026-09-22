@@ -23,3 +23,8 @@ regex = 'hll9310cdwlpr-([0-9.]+)-3\.i386\.rpm'
 source = "regex"
 url = "https://download.brother.com/welcome/dlf103221/hll9310cdwcupswrapper-1.5.0-3.i386.rpm"
 regex = 'hll9310cdwcupswrapper-([0-9.]+)-3\.i386\.rpm'
+
+[bruno]
+source = "regex"
+url = "https://api.github.com/repos/usebruno/bruno/releases/latest"
+regex = 'bruno_([0-9.]+)_amd64_linux\.deb'
