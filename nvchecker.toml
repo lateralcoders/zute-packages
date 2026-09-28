@@ -23,3 +23,8 @@ regex = 'hll9310cdwlpr-([0-9.]+)-3\.i386\.rpm'
 source = "regex"
 url = "https://download.brother.com/welcome/dlf103221/hll9310cdwcupswrapper-1.5.0-3.i386.rpm"
 regex = 'hll9310cdwcupswrapper-([0-9.]+)-3\.i386\.rpm'
+
+[gitkraken]
+source = "regex"
+url = "https://api.gitkraken.dev/releases/production/linux/x64/RELEASES"
+regex = '"name":"([0-9.]+)"'

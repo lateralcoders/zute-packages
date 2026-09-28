@@ -1,0 +1,40 @@
+# Maintainer: company (not AUR)
+# Official amd64 tarball. Install layout follows AUR gitkraken 12.5.0:
+# /opt/gitkraken, the launcher bundled in the tarball, desktop entries, chrome-sandbox mode.
+# Desktop files and eula.html are the AUR copies of upstream's deb entries.
+# They stay out of source=: this repo allows one https URL and one sha256.
+# Bump pkgver + sha256sums from the RELEASES JSON via scripts/propose-update.sh gitkraken.
+
+pkgname=gitkraken
+pkgver=12.5.0
+pkgrel=1
+pkgdesc='The intuitive, fast, and beautiful cross-platform Git client.'
+arch=('x86_64')
+url='https://www.gitkraken.com/'
+license=('LicenseRef-GitKraken')
+depends=('nss' 'gtk3' 'libsecret' 'libxkbfile')
+optdepends=('git-lfs: git-lfs support'
+            'org.freedesktop.secrets: store passwords and encryption keys')
+source=("https://api.gitkraken.dev/releases/production/linux/x64/${pkgver}/gitkraken-amd64.tar.gz")
+sha256sums=('f851909e06751e66072c1b5bdd6ade902f3f37d1dcb7e12522dbbccbf43eaabe')
+options=('!strip' '!debug')
+
+package() {
+  install -d "$pkgdir/opt"
+  cp -R "$srcdir/gitkraken" "$pkgdir/opt/gitkraken"
+
+  # chrome-sandbox must be setuid root for Electron's SUID sandbox; cp drops the
+  # bit. Restore it to match upstream's deb.
+  chmod 4755 "$pkgdir/opt/gitkraken/chrome-sandbox"
+
+  install -d "$pkgdir/usr/bin"
+  # Symlink the launcher shipped in the tarball (as the upstream deb does).
+  # It resolves its own path, so it works from /opt. URL handlers call it with --uri=.
+  ln -s /opt/gitkraken/resources/bin/gitkraken.sh "$pkgdir/usr/bin/gitkraken"
+
+  install -D -m644 "$startdir/eula.html" "$pkgdir/usr/share/licenses/${pkgname}/eula.html"
+  install -D -m644 "$startdir/GitKraken.desktop" "$pkgdir/usr/share/applications/GitKraken.desktop"
+  install -D -m644 "$startdir/gitkraken-url-handler.desktop" "$pkgdir/usr/share/applications/gitkraken-url-handler.desktop"
+  install -D -m644 "$startdir/gk-cli-url-handler.desktop" "$pkgdir/usr/share/applications/gk-cli-url-handler.desktop"
+  install -D -m644 "$pkgdir/opt/gitkraken/gitkraken.png" "$pkgdir/usr/share/pixmaps/gitkraken.png"
+}

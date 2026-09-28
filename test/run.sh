@@ -264,6 +264,86 @@ sed -i "s/^sha256sums=.*/sha256sums=('$H64D')/" "$ART/packages/delta/PKGBUILD"
 expect_fail 'sha256-of-url hash mismatch' 'sha256' verify "$ART"
 rm -rf "$ART"
 
+GK=$(mktemp -d)
+mkdir -p "$GK/arts/0.9.0" "$GK/arts/1.2.0" "$GK/sums" "$GK/packages/gk"
+printf 'old\n' >"$GK/arts/0.9.0/gitkraken-amd64.tar.gz"
+printf 'new\n' >"$GK/arts/1.2.0/gitkraken-amd64.tar.gz"
+GK_OLD=$(sha256sum "$GK/arts/0.9.0/gitkraken-amd64.tar.gz" | awk '{print $1}')
+GK_NEW=$(sha256sum "$GK/arts/1.2.0/gitkraken-amd64.tar.gz" | awk '{print $1}')
+printf '%s\n' "{\"name\":\"1.2.0\",\"url_targz\":\"file://${GK}/arts/1.2.0/gitkraken-amd64.tar.gz\"}" >"$GK/sums/gk.json"
+cat >"$GK/packages/gk/PKGBUILD" <<EOF
+pkgname=gk
+pkgver=0.9.0
+pkgrel=1
+arch=('x86_64')
+source=("https://vendor.example/gk-\${pkgver}.tar.gz")
+sha256sums=('$GK_OLD')
+EOF
+cat >"$GK/packages/gk/upstream" <<EOF
+host=vendor.example
+sums_url=file://${GK}/sums/gk.json
+sums_format=json-name-targz
+sums_glob=gitkraken-amd64.tar.gz
+version_regex="name":"([0-9.]+)"
+EOF
+write_allow "$GK" gk
+
+sed -i 's/^sums_glob=.*/sums_glob=nope.tar.gz/' "$GK/packages/gk/upstream"
+expect_fail 'json artifact basename' 'basename' verify "$GK"
+sed -i 's/^sums_glob=.*/sums_glob=gitkraken-amd64.tar.gz/' "$GK/packages/gk/upstream"
+
+printf '%s\n' '{"name":"1.2.0","url_targz":"file:///tmp/no-version-segment/gitkraken-amd64.tar.gz"}' >"$GK/sums/gk.json"
+expect_fail 'json version missing from artifact URL' 'not found' verify "$GK"
+printf '%s\n' "{\"name\":\"1.2.0\",\"url_targz\":\"file://${GK}/arts/1.2.0/gitkraken-amd64.tar.gz\"}" >"$GK/sums/gk.json"
+
+expect_ok 'json-name-targz verify older pkgver' verify "$GK"
+sed -i "s/^sha256sums=.*/sha256sums=('$H64D')/" "$GK/packages/gk/PKGBUILD"
+expect_fail 'json-name-targz hash mismatch' 'sha256' verify "$GK"
+sed -i "s/^sha256sums=.*/sha256sums=('$GK_OLD')/" "$GK/packages/gk/PKGBUILD"
+
+expect_ok 'json-name-targz propose' propose "$GK" gk
+if grep -q '^pkgver=1.2.0$' "$GK/packages/gk/PKGBUILD"; then
+  ok 'json-name-targz bumped to 1.2.0'
+else
+  bad "gk pkgver=$(company_pkgbuild_get "$GK/packages/gk/PKGBUILD" pkgver)"
+fi
+if grep -q "sha256sums=('$GK_NEW')" "$GK/packages/gk/PKGBUILD"; then
+  ok 'json-name-targz sha follows url_targz'
+else
+  bad 'json-name-targz sha not latest'
+fi
+expect_ok 'json-name-targz verify latest' verify "$GK"
+rm -f "$GK/arts/1.2.0/gitkraken-amd64.tar.gz"
+expect_ok 'json-name-targz propose current skips artifact' propose "$GK" gk
+if grep -q 'CURRENT gk 1.2.0' /tmp/cap-out; then
+  ok 'json-name-targz reports CURRENT'
+else
+  bad "json propose current: $(tr '\n' ' ' </tmp/cap-out)"
+fi
+rm -rf "$GK"
+
+GKH=$(mktemp -d)
+mkdir -p "$GKH/packages/gk" "$GKH/sums"
+printf '%s\n' '{"name":"1.0.0","url_targz":"https://evil.example/1.0.0/gitkraken-amd64.tar.gz"}' >"$GKH/sums/gk.json"
+cat >"$GKH/packages/gk/PKGBUILD" <<EOF
+pkgname=gk
+pkgver=1.0.0
+pkgrel=1
+arch=('x86_64')
+source=("https://vendor.example/gk-\${pkgver}.tar.gz")
+sha256sums=('$H64A')
+EOF
+cat >"$GKH/packages/gk/upstream" <<EOF
+host=vendor.example
+sums_url=file://${GKH}/sums/gk.json
+sums_format=json-name-targz
+sums_glob=gitkraken-amd64.tar.gz
+version_regex="name":"([0-9.]+)"
+EOF
+write_allow "$GKH" gk
+expect_fail 'json artifact host mismatch' 'artifact host' verify "$GKH"
+rm -rf "$GKH"
+
 expect_ok 'real allowlist PKGBUILDs' bash "$REPO/scripts/verify-pkgbuild.sh"
 
 printf '%s passed, %s failed\n' "$PASS" "$FAIL"

@@ -184,6 +184,8 @@ company_expand_glob() {
 # sums_format= in upstream. Default sha256sum (Keeper). debian-packages for apt
 # Packages. sha256-of-url for vendors that publish the artifact but no checksums file
 # (hash the fetched sums_url body; basename is the optional 3rd arg).
+# json-name-targz: sums_url is a JSON object with "name" and "url_targz"
+# (GitKraken RELEASES). Verify/propose hash the tarball; this helper does not.
 company_sums_format() {
   local up=$1 f
   f=$(company_kv_get "$up" sums_format) || true
@@ -249,6 +251,81 @@ company_sums_as_sha256sum() {
   esac
 }
 
+# First "key":"value" string in a flat JSON object. Literal match, not regex.
+company_json_string_field() {
+  local file=$1 key=$2
+  tr -d '\n' <"$file" | awk -v k="$key" '
+    BEGIN { found = 0 }
+    {
+      pat = "\"" k "\":\""
+      i = index($0, pat)
+      if (i == 0) next
+      rest = substr($0, i + length(pat))
+      q = index(rest, "\"")
+      if (q == 0) next
+      print substr(rest, 1, q - 1)
+      found = 1
+      exit
+    }
+    END { if (!found) exit 1 }
+  '
+}
+
+# Version from a json-name-targz document (the "name" field).
+company_json_name_targz_version() {
+  local name
+  name=$(company_json_string_field "$1" name) || {
+    echo 'RELEASES JSON missing name' >&2
+    return 1
+  }
+  [[ "$name" =~ ^[0-9.]+$ ]] || {
+    echo "release name is not a numeric version: $name" >&2
+    return 1
+  }
+  printf '%s\n' "$name"
+}
+
+# Artifact URL from a json-name-targz document.
+# $2 is the version to hash. Empty means the published url_targz (latest).
+# A different version replaces the /<published>/ path segment.
+company_json_name_targz_url() {
+  local json=$1 want=$2
+  local name url name_re replaced
+  name=$(company_json_name_targz_version "$json") || return 1
+  url=$(company_json_string_field "$json" url_targz) || {
+    echo 'RELEASES JSON missing url_targz' >&2
+    return 1
+  }
+  if [[ -n "$want" && "$want" != "$name" ]]; then
+    [[ "$want" =~ ^[0-9.]+$ ]] || {
+      echo "pkgver is not a numeric version: $want" >&2
+      return 1
+    }
+    name_re=${name//./\\.}
+    replaced=$(printf '%s\n' "$url" | sed "s|/${name_re}/|/${want}/|") || return 1
+    if [[ "$replaced" == "$url" ]]; then
+      echo "version $want not found in artifact URL" >&2
+      return 1
+    fi
+    url=$replaced
+  fi
+  printf '%s\n' "$url"
+}
+
+# SHA-256 of a URL body. Caller already checked scheme and host.
+company_sha256_url() {
+  local url=$1 tmp sha
+  tmp=$(mktemp)
+  if ! company_fetch "$url" "$tmp"; then
+    rm -f "$tmp"
+    return 1
+  fi
+  sha=$(sha256sum "$tmp" | awk '{print $1}')
+  rm -f "$tmp"
+  [[ "$sha" =~ ^[0-9a-fA-F]{64}$ ]] || return 1
+  printf '%s\n' "$sha"
+}
+
 # SHA-256 from a sha256sum-format file for an exact basename.
 company_sums_hash_for() {
   local sums_file=$1 want=$2
@@ -295,8 +372,8 @@ company_require_upstream() {
   sums_host=$(company_kv_get "$up" sums_host) || true
   sums_format=$(company_sums_format "$up")
   case "$sums_format" in
-    sha256sum|debian-packages|sha256-of-url) ;;
-    *) company_fail "$name: sums_format must be sha256sum, debian-packages, or sha256-of-url (got $sums_format)" ;;
+    sha256sum|debian-packages|sha256-of-url|json-name-targz) ;;
+    *) company_fail "$name: sums_format must be sha256sum, debian-packages, sha256-of-url, or json-name-targz (got $sums_format)" ;;
   esac
   [[ -n "$host" ]] || company_fail "$name: upstream missing host="
   [[ -n "$sums_url" ]] || company_fail "$name: upstream missing sums_url="
