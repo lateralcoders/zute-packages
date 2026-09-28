@@ -1,0 +1,10 @@
+# Vendor checksum gate. Required next to PKGBUILD.
+# GitKraken publishes no checksum catalog. RELEASES is one JSON object:
+# {"name","url_targz"}. Verify hashes the tarball for this pkgver (the version
+# segment in url_targz is swapped). Propose reads name and hashes url_targz
+# when that version differs.
+host=api.gitkraken.dev
+sums_url=https://api.gitkraken.dev/releases/production/linux/x64/RELEASES
+sums_format=json-name-targz
+sums_glob=gitkraken-amd64.tar.gz
+version_regex="name":"([0-9.]+)"
