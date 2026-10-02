@@ -184,6 +184,8 @@ company_expand_glob() {
 # sums_format= in upstream. Default sha256sum (Keeper). debian-packages for apt
 # Packages. sha256-of-url for vendors that publish the artifact but no checksums file
 # (hash the fetched sums_url body; basename is the optional 3rd arg).
+# github-tag-tarball: sums_url is GitHub release JSON. archive_url is the tag
+# archive with {pkgver}. Verify and propose hash that archive.
 company_sums_format() {
   local up=$1 f
   f=$(company_kv_get "$up" sums_format) || true
@@ -279,8 +281,88 @@ company_versions_from_sums() {
   done <"$sums_file" | sort -uV
 }
 
+# First "key": "value" string. Whitespace around the colon is optional.
+company_json_string_field() {
+  local file=$1 key=$2
+  tr -d '\n' <"$file" | awk -v k="$key" '
+    BEGIN { found = 0 }
+    {
+      keypat = "\"" k "\""
+      rest = $0
+      while (1) {
+        i = index(rest, keypat)
+        if (i == 0) break
+        tail = substr(rest, i + length(keypat))
+        if (tail ~ /^[[:space:]]*:[[:space:]]*"/) {
+          sub(/^[[:space:]]*:[[:space:]]*"/, "", tail)
+          q = index(tail, "\"")
+          if (q == 0) break
+          print substr(tail, 1, q - 1)
+          found = 1
+          exit
+        }
+        rest = substr(rest, i + 1)
+      }
+    }
+    END { if (!found) exit 1 }
+  '
+}
+
+# Version (no leading v) from a GitHub release JSON tag_name.
+company_github_tag_version() {
+  local tag ver
+  tag=$(company_json_string_field "$1" tag_name) || {
+    echo 'release JSON missing tag_name' >&2
+    return 1
+  }
+  [[ "$tag" == v* ]] || {
+    echo "tag_name must start with v: $tag" >&2
+    return 1
+  }
+  ver=${tag#v}
+  [[ "$ver" =~ ^[0-9.]+$ ]] || {
+    echo "tag_name is not v plus a numeric version: $tag" >&2
+    return 1
+  }
+  printf '%s\n' "$ver"
+}
+
+# Tag archive for a numeric version. upstream archive_url contains {pkgver}.
+company_github_tag_archive_url() {
+  local up=$1 ver=$2
+  local tmpl url
+  tmpl=$(company_kv_get "$up" archive_url) || {
+    echo 'upstream missing archive_url' >&2
+    return 1
+  }
+  [[ -n "$tmpl" ]] || {
+    echo 'upstream missing archive_url' >&2
+    return 1
+  }
+  [[ "$ver" =~ ^[0-9.]+$ ]] || {
+    echo "pkgver is not a numeric version: $ver" >&2
+    return 1
+  }
+  url=$(company_expand_glob "$tmpl" "$ver")
+  printf '%s\n' "$url"
+}
+
 company_fetch() {
   curl -fsSL "$1" -o "$2"
+}
+
+# SHA-256 of a URL body. Caller already checked scheme and host.
+company_sha256_url() {
+  local url=$1 tmp sha
+  tmp=$(mktemp)
+  if ! company_fetch "$url" "$tmp"; then
+    rm -f "$tmp"
+    return 1
+  fi
+  sha=$(sha256sum "$tmp" | awk '{print $1}')
+  rm -f "$tmp"
+  [[ "$sha" =~ ^[0-9a-fA-F]{64}$ ]] || return 1
+  printf '%s\n' "$sha"
 }
 
 company_require_upstream() {
@@ -295,8 +377,8 @@ company_require_upstream() {
   sums_host=$(company_kv_get "$up" sums_host) || true
   sums_format=$(company_sums_format "$up")
   case "$sums_format" in
-    sha256sum|debian-packages|sha256-of-url) ;;
-    *) company_fail "$name: sums_format must be sha256sum, debian-packages, or sha256-of-url (got $sums_format)" ;;
+    sha256sum|debian-packages|sha256-of-url|github-tag-tarball) ;;
+    *) company_fail "$name: sums_format must be sha256sum, debian-packages, sha256-of-url, or github-tag-tarball (got $sums_format)" ;;
   esac
   [[ -n "$host" ]] || company_fail "$name: upstream missing host="
   [[ -n "$sums_url" ]] || company_fail "$name: upstream missing sums_url="
@@ -316,6 +398,18 @@ company_require_upstream() {
       company_fail "$name: sums_url host $sums_url_host is not ${sums_host:-$host}"
   fi
   [[ "$version_regex" == *"("* ]] || company_fail "$name: version_regex must have a capture group"
+  if [[ "$sums_format" == github-tag-tarball ]]; then
+    local archive_url archive_host
+    archive_url=$(company_kv_get "$up" archive_url) || true
+    [[ -n "$archive_url" ]] || company_fail "$name: upstream missing archive_url="
+    [[ "$archive_url" == *'{pkgver}'* ]] || company_fail "$name: archive_url must contain {pkgver}"
+    company_url_scheme_ok "$archive_url" || company_fail "$name: archive_url must be https:// (got $archive_url)"
+    if [[ "$archive_url" != file://* ]]; then
+      archive_host=$(company_url_host "$archive_url")
+      company_host_ok "$archive_host" "$host" || \
+        company_fail "$name: archive_url host $archive_host is not $host"
+    fi
+  fi
 }
 
 # Load allowlist, refuse path-traversal names, refuse extra package dirs.

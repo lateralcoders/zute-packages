@@ -264,6 +264,82 @@ sed -i "s/^sha256sums=.*/sha256sums=('$H64D')/" "$ART/packages/delta/PKGBUILD"
 expect_fail 'sha256-of-url hash mismatch' 'sha256' verify "$ART"
 rm -rf "$ART"
 
+SH=$(mktemp -d)
+mkdir -p "$SH/packages/sh" "$SH/sums"
+printf 'old\n' >"$SH/sums/v0.9.0.tar.gz"
+printf 'new\n' >"$SH/sums/v1.2.0.tar.gz"
+SH_OLD=$(sha256sum "$SH/sums/v0.9.0.tar.gz" | awk '{print $1}')
+SH_NEW=$(sha256sum "$SH/sums/v1.2.0.tar.gz" | awk '{print $1}')
+printf '%s\n' '{ "tag_name": "v1.2.0" }' >"$SH/sums/latest.json"
+cat >"$SH/packages/sh/PKGBUILD" <<EOF
+pkgname=sh
+pkgver=0.9.0
+pkgrel=1
+arch=('x86_64')
+source=("https://github.com/Humblemonk/shurectl/archive/refs/tags/v\${pkgver}.tar.gz")
+sha256sums=('$SH_OLD')
+EOF
+cat >"$SH/packages/sh/upstream" <<EOF
+host=github.com
+sums_host=api.github.com
+sums_url=file://${SH}/sums/latest.json
+sums_format=github-tag-tarball
+sums_glob=v{pkgver}.tar.gz
+version_regex=tag_name": *"v([0-9.]+)
+archive_url=file://${SH}/sums/v{pkgver}.tar.gz
+EOF
+write_allow "$SH" sh
+expect_ok 'github-tag-tarball verify older pkgver' verify "$SH"
+sed -i "s/^sha256sums=.*/sha256sums=('$H64D')/" "$SH/packages/sh/PKGBUILD"
+expect_fail 'github-tag-tarball hash mismatch' 'sha256' verify "$SH"
+sed -i "s/^sha256sums=.*/sha256sums=('$SH_OLD')/" "$SH/packages/sh/PKGBUILD"
+sed -i 's/^sums_glob=.*/sums_glob=nope.tar.gz/' "$SH/packages/sh/upstream"
+expect_fail 'github-tag-tarball basename' 'basename' verify "$SH"
+sed -i 's/^sums_glob=.*/sums_glob=v{pkgver}.tar.gz/' "$SH/packages/sh/upstream"
+expect_ok 'github-tag-tarball propose' propose "$SH" sh
+if grep -q '^pkgver=1.2.0$' "$SH/packages/sh/PKGBUILD"; then
+  ok 'github-tag-tarball bumped to 1.2.0'
+else
+  bad "sh pkgver=$(company_pkgbuild_get "$SH/packages/sh/PKGBUILD" pkgver)"
+fi
+if grep -q "sha256sums=('$SH_NEW')" "$SH/packages/sh/PKGBUILD"; then
+  ok 'github-tag-tarball sha follows tag archive'
+else
+  bad 'github-tag-tarball sha not latest'
+fi
+expect_ok 'github-tag-tarball verify latest' verify "$SH"
+rm -f "$SH/sums/v1.2.0.tar.gz"
+expect_ok 'github-tag-tarball propose current skips archive' propose "$SH" sh
+if grep -q 'CURRENT sh 1.2.0' /tmp/cap-out; then
+  ok 'github-tag-tarball reports CURRENT'
+else
+  bad "sh propose current: $(tr '\n' ' ' </tmp/cap-out)"
+fi
+rm -rf "$SH"
+
+SHH=$(mktemp -d)
+mkdir -p "$SHH/packages/sh" "$SHH/sums"
+printf '%s\n' '{ "tag_name": "v1.0.0" }' >"$SHH/sums/latest.json"
+cat >"$SHH/packages/sh/PKGBUILD" <<EOF
+pkgname=sh
+pkgver=1.0.0
+pkgrel=1
+arch=('x86_64')
+source=("https://github.com/example/v\${pkgver}.tar.gz")
+sha256sums=('$H64A')
+EOF
+cat >"$SHH/packages/sh/upstream" <<EOF
+host=github.com
+sums_url=file://${SHH}/sums/latest.json
+sums_format=github-tag-tarball
+sums_glob=v{pkgver}.tar.gz
+version_regex=tag_name": *"v([0-9.]+)
+archive_url=https://evil.example/v{pkgver}.tar.gz
+EOF
+write_allow "$SHH" sh
+expect_fail 'github-tag-tarball archive host mismatch' 'archive_url host' verify "$SHH"
+rm -rf "$SHH"
+
 expect_ok 'real allowlist PKGBUILDs' bash "$REPO/scripts/verify-pkgbuild.sh"
 
 printf '%s passed, %s failed\n' "$PASS" "$FAIL"

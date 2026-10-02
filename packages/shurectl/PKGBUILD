@@ -1,0 +1,47 @@
+# Maintainer: company (not AUR)
+# Source build from the Git tag archive. Build and install steps follow the
+# upstream author's AUR recipe (Humblemonk): cargo --locked, udev rules, license.
+# The https URL is written out so the checksum gate can see it. $url is not
+# expanded inside source=.
+# Bump pkgver + sha256sums with scripts/propose-update.sh shurectl.
+
+pkgname=shurectl
+pkgver=2.7.0
+pkgrel=1
+pkgdesc='TUI configurator for Shure MOTIV USB audio interfaces and microphones'
+arch=('x86_64' 'aarch64')
+url='https://github.com/Humblemonk/shurectl'
+license=('GPL-3.0-only')
+depends=('libgcc' 'glibc' 'alsa-lib' 'systemd-libs')
+makedepends=('cargo')
+install=shurectl.install
+source=("${pkgname}-${pkgver}.tar.gz::https://github.com/Humblemonk/shurectl/archive/refs/tags/v${pkgver}.tar.gz")
+sha256sums=('1f36e3527f094ccba532d0aba61c62cfc9def18df1f402bda73720d99d7df5fd')
+
+prepare() {
+  cd "$pkgname-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --target "$CARCH-unknown-linux-gnu"
+}
+
+build() {
+  cd "$pkgname-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR=target
+  cargo build --frozen --release
+}
+
+check() {
+  cd "$pkgname-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR=target
+  cargo test --frozen
+}
+
+package() {
+  cd "$pkgname-$pkgver"
+  install -Dm0755 -t "$pkgdir/usr/bin/" "target/release/$pkgname"
+  install -Dm0644 -t "$pkgdir/usr/lib/udev/rules.d/" 62-shure.rules
+  install -Dm0644 -t "$pkgdir/usr/share/doc/$pkgname/" README.md
+  install -Dm0644 -t "$pkgdir/usr/share/licenses/$pkgname/" LICENSE
+}

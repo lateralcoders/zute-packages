@@ -22,14 +22,20 @@ company_load_gate
 export PACKAGER="${PACKAGER:-Company Arch Packages <packages@localhost>}"
 export GPGKEY="$fpr"
 
+if grep -q "makedepends=('cargo')" "$ROOT"/packages/*/PKGBUILD; then
+  command -v cargo >/dev/null || { echo "need cargo (pacman -S rust); shurectl builds from source" >&2; exit 1; }
+  ldconfig -p 2>/dev/null | grep -q 'libasound.so.2' || { echo "need alsa-lib; shurectl links libasound" >&2; exit 1; }
+fi
+
 for name in "${company_pkgs[@]}"; do
   dir="$ROOT/packages/$name"
   [[ -f "$dir/PKGBUILD" ]] || { echo "missing $dir/PKGBUILD" >&2; exit 1; }
   (
     cd "$dir"
     rm -rf src pkg
-    # --nodeps: depends= are for the laptop (gtk3, nss, …), not this builder.
-    # package() only unpacks a vendor .deb; installing a desktop stack in CI is waste.
+    # --nodeps: depends= are for the laptop (gtk3, nss, alsa-lib, …), not this builder.
+    # Deb/rpm packages only unpack. shurectl runs cargo, so rust and alsa-lib
+    # must already be installed (publish.yml does that).
     makepkg -f --clean --nodeps --sign --key "$fpr"
     mv -f ./*.pkg.tar.zst "$ROOT/repo/"
     mv -f ./*.pkg.tar.zst.sig "$ROOT/repo/"

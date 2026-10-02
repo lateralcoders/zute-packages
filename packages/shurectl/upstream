@@ -1,0 +1,10 @@
+# GitHub latest release names the tag. There is no checksum catalog for the
+# auto-generated tag archive, so CI downloads that archive and hashes it.
+# archive_url {pkgver} is the same file as PKGBUILD source=.
+host=github.com
+sums_host=api.github.com
+sums_url=https://api.github.com/repos/Humblemonk/shurectl/releases/latest
+sums_format=github-tag-tarball
+sums_glob=v{pkgver}.tar.gz
+version_regex=tag_name": *"v([0-9.]+)
+archive_url=https://github.com/Humblemonk/shurectl/archive/refs/tags/v{pkgver}.tar.gz

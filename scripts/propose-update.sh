@@ -18,6 +18,68 @@ in_allowlist() {
   return 1
 }
 
+propose_github_tag_tarball() {
+  local name=$1
+  local pkg up sums_url version_regex tmp err reason body captured latest cur sha url art_host base want host
+  pkg=$(company_pkgbuild_file "$name")
+  up=$(company_upstream_file "$name")
+  sums_url=$(company_kv_get "$up" sums_url)
+  version_regex=$(company_kv_get "$up" version_regex)
+  host=$(company_kv_get "$up" host)
+  tmp=$(mktemp)
+  err=$(mktemp)
+  company_fetch "$sums_url" "$tmp" || {
+    rm -f "$tmp" "$err"
+    company_fail "$name: could not fetch $sums_url"
+  }
+  body=$(tr -d '\n' <"$tmp")
+  if [[ ! "$body" =~ $version_regex ]]; then
+    rm -f "$tmp" "$err"
+    company_fail "$name: version_regex did not match $sums_url"
+  fi
+  captured="${BASH_REMATCH[1]}"
+  latest=$(company_github_tag_version "$tmp" 2>"$err") || {
+    reason=$(tr '\n' ' ' <"$err")
+    rm -f "$tmp" "$err"
+    company_fail "$name: ${reason:-bad release JSON}"
+  }
+  rm -f "$tmp"
+  if [[ "$captured" != "$latest" ]]; then
+    rm -f "$err"
+    company_fail "$name: version_regex captured $captured but tag_name is $latest"
+  fi
+  cur=$(company_pkgbuild_get "$pkg" pkgver)
+  if [[ "$cur" == "$latest" ]]; then
+    rm -f "$err"
+    printf 'CURRENT %s %s\n' "$name" "$latest"
+    return 0
+  fi
+  url=$(company_github_tag_archive_url "$up" "$latest" 2>"$err") || {
+    reason=$(tr '\n' ' ' <"$err")
+    rm -f "$err"
+    company_fail "$name: ${reason:-bad archive_url}"
+  }
+  rm -f "$err"
+  if [[ "$url" != file://* ]]; then
+    art_host=$(company_url_host "$url")
+    company_host_ok "$art_host" "$host" || company_fail "$name: artifact host $art_host is not $host"
+  fi
+  company_url_scheme_ok "$url" || company_fail "$name: artifact URL must be https:// (got $url)"
+  base=$(basename "${url%%\?*}")
+  want=$(company_expand_glob "$(company_kv_get "$up" sums_glob)" "$latest")
+  [[ "$base" == "$want" ]] || company_fail "$name: artifact basename $base is not $want"
+  sha=$(company_sha256_url "$url") || company_fail "$name: could not hash $url"
+  [[ ${#sha} -eq 64 ]] || company_fail "$name: parse failed for $want"
+
+  sed -i "s/^pkgver=.*/pkgver=$latest/" "$pkg"
+  sed -i "s/^pkgrel=.*/pkgrel=1/" "$pkg"
+  sed -i "s/^sha256sums=.*/sha256sums=('${sha,,}')/" "$pkg"
+
+  printf 'UPDATED %s %s -> %s\n' "$name" "$cur" "$latest"
+  printf 'next: git checkout -b bump-%s-%s && git add packages/%s/PKGBUILD && git commit && gh pr create\n' \
+    "$name" "$latest" "$name"
+}
+
 propose_one() {
   local name=$1
   local pkg up sums_url sums_glob version_regex tmp latest cur sha want format norm url_base
@@ -28,6 +90,11 @@ propose_one() {
   sums_glob=$(company_kv_get "$up" sums_glob)
   version_regex=$(company_kv_get "$up" version_regex)
   format=$(company_sums_format "$up")
+
+  if [[ "$format" == github-tag-tarball ]]; then
+    propose_github_tag_tarball "$name"
+    return
+  fi
 
   tmp=$(mktemp)
   company_fetch "$sums_url" "$tmp" || {

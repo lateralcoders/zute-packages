@@ -37,7 +37,9 @@ jobs:
       - name: pacman
         run: |
           pacman -Sy --noconfirm archlinux-keyring
-          pacman -Syu --noconfirm --needed git gnupg github-cli sudo fakeroot debugedit curl
+          # rust + alsa-lib: shurectl compiles in package(). makepkg --nodeps does not
+          # install makedepends or depends. pkgconf is already in base-devel.
+          pacman -Syu --noconfirm --needed git gnupg github-cli sudo fakeroot debugedit curl rust alsa-lib
 
       - uses: actions/checkout@v4
 

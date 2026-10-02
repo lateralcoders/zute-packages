@@ -2,7 +2,7 @@
 
 Laptop operators: **[QUICKSTART.md](QUICKSTART.md)**.
 
-Signed **pacman** repo for vendor apps Arch does not ship. Packages: **Keeper Desktop**, **Slack Desktop** (official `.deb` wrappers), and **Brother HL-L9310CDW** LPR + CUPS wrapper (official `.rpm` wrappers).
+Signed **pacman** repo for vendor apps Arch does not ship. Packages: **Keeper Desktop**, **Slack Desktop** (official `.deb` wrappers), **Brother HL-L9310CDW** LPR + CUPS wrapper (official `.rpm` wrappers), and **shurectl** (Git tag archive, built with cargo the way the upstream AUR recipe does).
 
 Sibling of `omarchy-policy-exception` (same parent directory). This is **not** AUR, Chaotic-AUR, Snap, or a second Omarchy.
 
@@ -75,7 +75,7 @@ PRs never see `GPG_SECRET_KEY`. Forks cannot publish.
 
 ```bash
 sudo ../company-arch-packages/scripts/enable-repo.sh
-sudo pacman -S keeper-password-manager slack-desktop
+sudo pacman -S keeper-password-manager slack-desktop shurectl
 ```
 
 `enable-repo.sh` infers `origin` and writes
@@ -109,9 +109,9 @@ Do **not** put this repo or `.pkg.tar.zst` on the day-one USB. That stick is ISO
 Same human PR, all of:
 
 1. `packages/<name>/PKGBUILD`
-2. `packages/<name>/upstream` (`host`, `sums_url`, `sums_glob`, `version_regex`; optional `sums_host` if checksums are on another FQDN; optional `sums_format=debian-packages` if the vendor publishes a Debian `Packages` index instead of a `sha256sum` file)
+2. `packages/<name>/upstream` (`host`, `sums_url`, `sums_glob`, `version_regex`; optional `sums_host` if checksums are on another FQDN; optional `sums_format`; `github-tag-tarball` also needs `archive_url` with `{pkgver}`)
 3. Add the name to `allowlist.txt`
 
-`sums_format` defaults to `sha256sum` (Keeper). Slack uses `debian-packages`: CI converts `Filename:` + `SHA256:` stanzas into the same hash check. Brother uses `sha256-of-url`: the vendor does not publish a checksums catalog, so CI downloads the official RPM at `sums_url` and requires PKGBUILD `sha256sums` to match that file.
+`sums_format` defaults to `sha256sum` (Keeper). Slack uses `debian-packages`: CI converts `Filename:` + `SHA256:` stanzas into the same hash check. Brother uses `sha256-of-url`: the vendor does not publish a checksums catalog, so CI downloads the official RPM at `sums_url` and requires PKGBUILD `sha256sums` to match that file. shurectl uses `github-tag-tarball`: `sums_url` is the GitHub latest-release JSON (`tag_name`). `archive_url` is the tag archive with `{pkgver}` filled in. Verify hashes that tarball. Propose reads `tag_name` and hashes the new archive when the version differs.
 
 CI fails names not on the list, `packages/*` dirs not on the list, missing `upstream`, `source=` host mismatch, and sha256 ≠ vendor checksums. Merge to `main` republishes the whole `[company]` db. The bot may later bump that PKGBUILD; it cannot add the name.
